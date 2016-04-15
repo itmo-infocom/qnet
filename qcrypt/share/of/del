@@ -1,0 +1,8 @@
+#!/bin/sh
+. ./settings
+
+for s in $SWITCHES
+do
+	curl -X POST http://0.0.0.0:8080/stats/flowentry/delete -d '{"dpid":'$s'}'
+	echo curl -X POST http://0.0.0.0:8080/stats/flowentry/delete -d '{"dpid":'$s'}'
+done

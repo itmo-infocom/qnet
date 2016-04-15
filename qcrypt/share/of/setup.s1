@@ -1,0 +1,23 @@
+#!/bin/sh
+
+ovs-vsctl del-br of
+ovs-vsctl add-br of
+ovs-vsctl add-port of eth1
+ovs-vsctl add-port of eth2
+ovs-vsctl add-port of local
+ovs-vsctl set interface local mac="00\:00\:00\:00\:00\:03"
+ovs-vsctl set interface local type=internal
+
+ifconfig eth1 0
+ifconfig eth2 0
+ifconfig of 0
+ifconfig local 10.1.1.3 netmask 255.255.255.0
+
+#ifconfig eth1 promisc up
+##ifconfig eth2 promisc up
+##ifconfig of promisc up
+##ifconfig local promisc up
+
+ovs-vsctl set-fail-mode of standalone
+ovs-vsctl set-fail-mode of secure
+ovs-vsctl set-controller of tcp:172.16.0.54:6633

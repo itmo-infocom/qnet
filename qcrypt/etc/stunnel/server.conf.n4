@@ -1,0 +1,14 @@
+key = /etc/stunnel/stunnel.pem
+cert = /etc/stunnel/stunnel.pem
+client=no
+chroot = /var/tmp/stunnel
+pid = /server.pid
+setuid = nobody
+setgid = nobody
+debug = 7
+output = /var/log/stunnel-server.log
+[stunnel]
+accept = 1003
+connect=10.1.1.2:1000
+[root@n4 ~]# cat /etc/sysconfig/stunnel
+STUNNEL_CONFS="server"

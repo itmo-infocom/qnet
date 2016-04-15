@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/opt/qcrypt/sbin/qbcrypt /opt/qcrypt/share/qbcrypt _Bob.key 2>>/var/log/qcrypt.log | nc $1 $2

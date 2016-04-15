@@ -1,0 +1,16 @@
+STUNNEL_CONFS="client"
+pt/qnet/qcrypt/etc/stunnel/client.conf.n5 sadov@172.16.0.9:/home/sadov/work/qcry 
+ssh: connect to host 172.16.0.9 port 22: Network is unreachable
+lost connecticat /etc/stunnel/client.conf 
+key = /etc/stunnel/stunnel.pem
+cert = /etc/stunnel/stunnel.pem
+client=yes
+chroot = /var/tmp/stunnel
+pid = /client.pid
+setuid = nobody
+setgid = nobody
+debug = 7
+output = /var/log/stunnel-client.log
+[stunnel]
+accept = 1001
+connect=10.1.1.2:1003

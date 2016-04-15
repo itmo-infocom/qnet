@@ -1,0 +1,25 @@
+# Transparent
+service trans
+{
+        #disable        = yes
+        disable = no
+        port            = 1000
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /usr/bin/nc
+        server_args     = 10.1.1.2 1000
+}
+
+# Quantum-encrypted
+service qcrypt
+{
+        #disable        = yes
+        disable = no
+        port            = 1002
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /opt/qcrypt/sbin/qcrypt
+        server_args     = 10.1.1.2 1004
+}

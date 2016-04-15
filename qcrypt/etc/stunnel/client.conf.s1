@@ -1,0 +1,12 @@
+key = /etc/stunnel/stunnel.pem
+cert = /etc/stunnel/stunnel.pem
+client=yes
+chroot = /var/tmp/stunnel
+pid = /client.pid
+setuid = nobody
+setgid = nobody
+debug = 7
+output = /var/log/stunnel-client.log
+[stunnel]
+accept = 1001
+connect=10.1.1.4:1003

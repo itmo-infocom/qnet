@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# stunnel 
+#
+# chkconfig:   - 23 88
+# description: Stunnel is a socket wrapper which can provide SSL (Secure Sockets
+# Layer) support to ordinary applications.
+# processname: stunnel
+# config:      /etc/stunnel/*.conf
+#
+### BEGIN INIT INFO
+# Provides: stunnel
+# Required-Start: $local_fs 
+# Required-Stop: $local_fs 
+# Default-Start:
+# Default-Stop: 0 1 6
+# Short-Description: start and stop stunnel
+# Description: stunnel is SSL-encrypting socket wrapper
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+exec="/usr/bin/stunnel"
+prog=$(basename $exec)
+lockfile=/var/lock/subsys/$prog
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+start() {
+	for conf in $STUNNEL_CONFS
+	do
+ 		echo -n $"Starting $prog $conf"
+		$prog /etc/stunnel/$conf.conf
+		retval=$?
+		echo
+		if [ $retval -eq 0 ]
+		then
+			touch $lockfile
+		else
+			return $retval
+		fi
+	done
+	return $retval
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killall $prog
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
+}
+
+restart() {
+	stop
+	start
+}
+
+reload() {
+	restart
+}
+
+force_reload() {
+	restart
+}
+
+fdr_status() {
+	status $prog
+}
+
+
+case "$1" in
+	start|stop|restart|reload)
+  		$1
+		;;
+	force-reload)
+		force_reload
+		;;
+	status)
+		fdr_status
+		;;
+	condrestart|try-restart)
+		[ -f $lockfile ] && restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|status|restart|try-restart|reload|force-reload}"
+		exit 1
+esac
+

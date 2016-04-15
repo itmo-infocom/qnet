@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# ofsetup 
+#
+# chkconfig:   - 23 88
+# description: Setting up of OpenFlow configuration
+# processname: ofsetup
+# config:      /etc/ofsetup/ofsetup.conf
+#
+### BEGIN INIT INFO
+# Provides: ofsetup
+# Required-Start: $local_fs $network $openvswitch
+# Required-Stop: $local_fs $network $openvswitch
+# Default-Start:
+# Default-Stop: 0 1 6
+# Short-Description: start and stop ofsetup
+# Description: OpenFlow configuratior
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+exec="/opt/qcrypt/share/of/setup"
+prog=ofsetup
+lockfile=/var/lock/subsys/$prog
+
+start() {
+ 	echo -n $"Starting OF setup:"
+	/opt/qcrypt/share/of/setup
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
+}
+
+stop() {
+	echo -n $"Stopping OF: "
+	ovs-vsctl del-br of
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
+}
+
+restart() {
+	stop
+	start
+}
+
+reload() {
+	restart
+}
+
+force_reload() {
+	restart
+}
+
+fdr_status() {
+	ovs-ofctl dump-flows of
+}
+
+
+case "$1" in
+	start|stop|restart|reload)
+  		$1
+		;;
+	force-reload)
+		force_reload
+		;;
+	status)
+		fdr_status
+		;;
+	condrestart|try-restart)
+		[ -f $lockfile ] && restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|status|restart|try-restart|reload|force-reload}"
+		exit 1
+esac
+

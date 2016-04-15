@@ -1,0 +1,14 @@
+STUNNEL_CONFS="server"
+[root@node2 ~]# cat /etc/stunnel/server.conf 
+key = /etc/stunnel/stunnel.pem
+cert = /etc/stunnel/stunnel.pem
+client=no
+chroot = /var/tmp/stunnel
+pid = /stunnel.pid
+setuid = nobody
+setgid = nobody
+debug = 7
+output = /var/log/stunnel.log
+[stunnel]
+accept = 1003
+connect=localhost:1000

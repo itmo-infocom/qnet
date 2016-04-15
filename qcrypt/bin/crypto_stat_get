@@ -1,0 +1,26 @@
+#!/bin/sh
+
+killall tcpdump
+sleep 1
+
+for i in $*
+do
+	STATUS=CRYPTED
+	tcpdump -A -nn -e -r /tmp/analyze.$i | grep -q 1234567890
+	if [ $? -eq 0 ]
+	then
+		STATUS=UNCRYPTED
+	else
+		CRYPT=`tcpdump -A -nn -e -r /tmp/analyze.$i | grep ' > 10.1.1.2.100[34]' | sed 's/.* > 10.1.1.2.\(100[34]\).*/\1/' | sort | uniq`
+		case $CRYPT in
+			1003)
+				STATUS=SSL
+				;;
+			1004)
+				STATUS=Quantum
+				;;
+		esac
+	fi
+	echo CHANNEL $i: $STATUS
+done
+

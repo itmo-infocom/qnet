@@ -1,0 +1,4 @@
+#!/bin/sh
+
+. /opt/rh/python27/enable
+ryu-manager --verbose ryu.app.ofctl_rest /opt/qcrypt/share/of/qcrypt.py > /var/log/ryu.log 2>&1 &

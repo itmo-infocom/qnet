@@ -1,0 +1,4 @@
+trans           1000/tcp
+scrypt          1001/tcp
+qcrypt          1002/tcp
+quncrypt        1004/tcp

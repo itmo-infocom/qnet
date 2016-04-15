@@ -1,0 +1,26 @@
+# Transparent
+service trans
+{
+        #disable        = yes
+        disable = no
+        port            = 1000
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /opt/qcrypt/sbin/trans
+        server_args     = /tmp/top-secret.txt
+}
+
+# Quantum-encrypted
+
+service quncrypt
+{
+        #disable        = yes
+        disable = no
+        port            = 1004
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /opt/qcrypt/sbin/quncrypt
+        server_args     = 10.1.1.2 1000
+}

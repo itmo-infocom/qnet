@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. ./settings
+
+for s in $SWITCHES
+do
+	curl -X GET http://0.0.0.0:8080/stats/flow/$s
+done
