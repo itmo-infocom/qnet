@@ -1,0 +1,7 @@
+digraph G {
+	label = "Схема общения между узлами"
+
+	graph [layout=dot rankdir=LR]
+
+	GUI -> Bob -> Alice
+}
