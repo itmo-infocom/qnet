@@ -31,14 +31,14 @@ int main( void )
 	//Конфигурация по умолчанию для сокета
 			{
 				config_default.addr.sin_family = AF_INET;
-					char default_hostname[] = "localhost4";
-					struct hostent *server = gethostbyname( default_hostname );
-					if (server == NULL )
-					{
-						cerr 	<< "bob_main: No such hostname "
-							<< default_hostname << endl;
-						return EXIT_FAILURE;
-					}
+				char default_hostname[] = "localhost4";
+				struct hostent *server = gethostbyname( default_hostname );
+				if (server == NULL )
+				{
+					cerr 	<< "bob_main: No such hostname "
+						<< default_hostname << endl;
+					return EXIT_FAILURE;
+				}
 
 				bcopy(
 					(char *) server->h_addr,
