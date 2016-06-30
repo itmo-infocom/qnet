@@ -54,9 +54,6 @@ int main( void )
 	
 	while (true)//start внешний цикл
 	{
-		//Самый внешний цикл - заставляет повториться всю программу,
-		//если что-то пошло не так
-		
 		//Инициализация сокета
 		{		
 			//Дескриптор сокета - далее нам надо будет его прослушивать,
@@ -92,7 +89,7 @@ int main( void )
 			
 				//В этой точке у нас точно налажена связь с Алисой.
 				//Теперь нам надо перед ней представиться, чтобы она не подумала, что мы являемся GUI
-				char Im_Bob = bob;
+				char Im_Bob = type::bob;
 				int n = send( Alice, &Im_Bob, sizeof( Im_Bob ), 0 );
 				if ( n < 0 )
 				{
@@ -106,13 +103,24 @@ int main( void )
 				
 					//Внутри этого цикла необходимо размещать весь интеллект,
 					//связанный с работой платы и прочим-прочим
+					
+					
 					break;
 					
 				}//end рабочий цикл
 		
 				//Не забываем закрыть все соединения
-				close( Alice );
-				if ( GUI != -1 ) close( GUI );//Может быть и так, что GUI не подключён
+				if (close( Alice ) < 0) 
+				{
+					cerr << "bob_main: Cannot close connection with alice" << endl;
+					return EXIT_FAILURE;
+				}
+				if ( GUI != -1 ) 
+					if (close( GUI ) < 0)//Может быть и так, что GUI не подключён
+					{
+						cerr << "bob_main: Cannot close connection with GUI" << endl;
+						return EXIT_FAILURE;
+					}
 				
 			}//end цикл socket connect
 			

@@ -18,6 +18,8 @@ using namespace std;//Чтобы не указывать это явно пер�
 //Прототипы функций
 	#include "common.cpp"
 
+	#define PRINT(text) cout << "alice_main: text" << endl;
+
 //---------------------------------------
 //Точка входа
 int main( void )
@@ -30,12 +32,10 @@ int main( void )
 		config_default.addr_len = sizeof( config.addr );
 	}	
 		
-	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
-			//если что-то пошло не так
+	while ( true )//start внешний цикл
 	{
 		read_config();
 		
-		//int socket = socket_init( config.addr );
 		int sock = socket( AF_INET, SOCK_STREAM, 0 );
 		//Дескриптор сокета - далее нам надо будет его прослушивать,
 		//чтобы установить связь с Бобом и/или GUI
@@ -49,23 +49,26 @@ int main( void )
 			return EXIT_FAILURE;
 		}
 
+		//Обычно
 		if ( bind(
 			sock,
 			(struct sockaddr *) &config.addr,
 			config.addr_len ) < 0 )
 		{
-			cerr << "alice_main: Cannot bind socket" << endl;
+			cerr << "alice_main: Cannot bind socket - perhaps, port is busy" << endl;
 			return EXIT_FAILURE;
 		}
 		
+		
 		//Теперь будем ждать пока к нам кто-нибудь подключится.
 		//Подключиться могут только двое - Боб или GUI:
-		if ( listen( sock, 2 ) < 0 )
+		if ( listen( sock, 2 ) < 0 )//Здесь выполнение блочится пока кто-нибудь к нам не постучится
 		{
 			//Если даже слушать не можем - то тоже падаем в обморок,
 			//т.к. не знаю допустимо ли такое вообще и при каких условиях
 			//эта ошибка возникает.
 			cerr << "alice_main: Cannot listen socket" << endl;
+			return EXIT_FAILURE;
 		}
 		
 		int Bob = -1, GUI = -1; 
@@ -73,10 +76,9 @@ int main( void )
 		//По умолчанию GUI к нам не подключён. А вот без Боба нам никак
 		
 		while ( Bob == -1 )//Установка соединения с Бобом
-			//Будет крутить этот кусок до тех пор, пока не установим
-			//связь с Бобом
+		//Будет крутить этот кусок до тех пор, пока не установим
+		//связь с Бобом
 		{
-			
 			int temp_client = accept(
 				sock,
 				(struct sockaddr *) &config.addr,
@@ -87,7 +89,7 @@ int main( void )
 			if ( temp_client < 0 )
 			{
 				cerr << "alice_main: Cannot connect to Bob" << endl;
-				return EXIT_FAILURE;
+				continue;
 			}
 			
 			char who_are_you;
@@ -103,19 +105,25 @@ int main( void )
 				return EXIT_FAILURE;
 			}
 
-			if ( who_are_you == bob ) Bob = temp_client;
-			else GUI = temp_client;
+			if ( who_are_you == type::bob ) 
+			{
+				Bob = temp_client;
+				PRINT(Established connection with Bob)
+			}
+			else if ( who_are_you == type::gui ) 
+			{
+				PRINT(Established cnnection with GUI)
+				GUI = temp_client;
+			}
 		}//end Установка соединения с Бобом
 		
 		//В этой точке у нас точно налажена связь с Бобом
 
 		//Теперь создадим цикл, в котором будем крутить основной алгоритм
 		//работы
-		bool work_flag = true;
-		while ( work_flag )//рабочий цикл
+		while (true)//рабочий цикл
 		{
-			cout << "alice_main: Successfully connected with Bob" << endl;
-			break;
+			//В теле этого цикла необходимо разместить весь интеллект, касающийся работы самой программы
 		}//end рабочий цикл
 		
 		//Не забываем закрыть все соединения
@@ -124,8 +132,12 @@ int main( void )
 			cerr << "alice_main: Cannot close connection with Bob" << endl;
 			return EXIT_FAILURE;
 		};
-		if ( GUI != -1 ) close( GUI );
-		//Может быть и так, что GUI не подключён
+		if ( GUI != -1 ) 
+			if (close( GUI ) < 0)//Может быть и так, что GUI не подключён
+			{
+				cerr << "alice_main: Cannot close connection with GUI" << endl;
+				return EXIT_FAILURE;
+			}
 
 		close( sock );
 		break;
