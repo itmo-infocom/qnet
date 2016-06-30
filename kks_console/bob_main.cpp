@@ -91,7 +91,7 @@ int main( void )
 			
 				//В этой точке у нас точно налажена связь с Алисой.
 				//Теперь нам надо перед ней представиться, чтобы она не подумала, что мы являемся GUI
-				char Im_Bob = type::bob;
+				char Im_Bob = device::bob;
 				int n = send( sock, &Im_Bob, sizeof( Im_Bob ), 0 );
 				if ( n < 0 )
 				{

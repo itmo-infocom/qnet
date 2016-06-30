@@ -105,12 +105,12 @@ int main( void )
 				return EXIT_FAILURE;
 			}
 
-			if ( who_are_you == type::bob ) 
+			if ( who_are_you == device::bob ) 
 			{
 				Bob = temp_client;
 				PRINT("Established connection with Bob")
 			}
-			else if ( who_are_you == type::gui ) 
+			else if ( who_are_you == device::gui ) 
 			{
 				PRINT("Established cnnection with GUI")
 				GUI = temp_client;
