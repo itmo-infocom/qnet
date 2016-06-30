@@ -18,7 +18,7 @@ using namespace std;//Чтобы не указывать это явно пер�
 //Прототипы функций
 	#include "common.cpp"
 
-	#define PRINT(text) cout << "alice_main: text" << endl;
+	#define PRINT(text) cout << "alice_main: " << text << endl;
 
 //---------------------------------------
 //Точка входа
@@ -108,11 +108,11 @@ int main( void )
 			if ( who_are_you == type::bob ) 
 			{
 				Bob = temp_client;
-				PRINT(Established connection with Bob)
+				PRINT("Established connection with Bob")
 			}
 			else if ( who_are_you == type::gui ) 
 			{
-				PRINT(Established cnnection with GUI)
+				PRINT("Established cnnection with GUI")
 				GUI = temp_client;
 			}
 		}//end Установка соединения с Бобом
@@ -123,7 +123,11 @@ int main( void )
 		//работы
 		while (true)//рабочий цикл
 		{
+		
 			//В теле этого цикла необходимо разместить весь интеллект, касающийся работы самой программы
+			
+			return EXIT_SUCCESS;
+			
 		}//end рабочий цикл
 		
 		//Не забываем закрыть все соединения

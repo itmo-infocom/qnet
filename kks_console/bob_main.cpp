@@ -22,7 +22,7 @@ using namespace std;//Чтобы не указывать это явно пер�
 //Прототипы функций
 	#include "common.cpp"
 	
-	#define PRINT(text) cout << "bob_main: text" << endl;
+	#define PRINT(text) cout << "bob_main: " << text << endl;
 
 //---------------------------------------
 //Точка входа
@@ -68,12 +68,13 @@ int main( void )
 				cerr << "bob_main: Cannot create socket" << endl;
 				return EXIT_FAILURE;
 			}
+			
 			while (true)//start цикл socket connect
 			{
 				int Alice, GUI = -1; 
 				//Дескрипторы соединений
 				//По умолчанию GUI к нам не подключён. А вот без Алисы нам никак
-				PRINT(Connecting to Alice...)
+				PRINT("Connecting to Alice...")
 				Alice = connect (
 						sock,
 						(struct sockaddr *) &config.addr,
@@ -82,15 +83,16 @@ int main( void )
 				if (Alice < 0) 
 				{
 					cerr << "bob_main: Cannot connect to Alice" << endl;
+					sleep(1);
 					continue;
 				}
 			
-				PRINT(Successfully connected to Alice)
+				PRINT("Successfully connected to Alice")
 			
 				//В этой точке у нас точно налажена связь с Алисой.
 				//Теперь нам надо перед ней представиться, чтобы она не подумала, что мы являемся GUI
 				char Im_Bob = type::bob;
-				int n = send( Alice, &Im_Bob, sizeof( Im_Bob ), 0 );
+				int n = send( sock, &Im_Bob, sizeof( Im_Bob ), 0 );
 				if ( n < 0 )
 				{
 					cerr << "bob_main: Cannot send a packet to Alice" << endl;
@@ -104,7 +106,7 @@ int main( void )
 					//Внутри этого цикла необходимо размещать весь интеллект,
 					//связанный с работой платы и прочим-прочим
 					
-					
+					return EXIT_SUCCESS;
 					break;
 					
 				}//end рабочий цикл
