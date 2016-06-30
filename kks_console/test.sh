@@ -1,3 +1,3 @@
 ./compile.sh
-./alice &
-./bob
+./build/alice.o &
+./build/bob.o
