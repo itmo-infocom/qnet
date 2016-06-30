@@ -103,7 +103,7 @@ int main( void )
 				return EXIT_FAILURE;
 			}
 
-			if ( who_are_you == BOB ) Bob = temp_client;
+			if ( who_are_you == bob ) Bob = temp_client;
 			else GUI = temp_client;
 		}//end Установка соединения с Бобом
 		
