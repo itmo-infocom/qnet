@@ -5,22 +5,26 @@
 
 //-------------------------------------------------------------------
 //Общие константы
-	#define BOB 0
-	#define BITSET_MINIMAL_SIZE 64 	//Размер bitset квантуется с таким размером 
-					//т.е. по 8 байт
+	//Чтобы отличить отправителя от получателя
+		enum type_of_app
+		{
+			bob,
+			alice
+		};
+
 //-------------------------------------------------------------------
 //Общие типы данных и структуры
 	//Данная структура предназначена для обмена между Алисой и Бобом
 	//отсчётами, на которых было срабатывание детектора
 		struct detections
 		{
-			bitset<BITSET_MINIMAL_SIZE> basis;//Базис
-			bitset<BITSET_MINIMAL_SIZE> key;
+			vector<bool> basis;//Базис
+			vector<bool> key;
 			//Значение ключа в данном отсчёта
-			bitset<BITSET_MINIMAL_SIZE> special;
+			vector<bool> special;
 			//Для вычисления QBER или чего-нибудь странного
 
-			unsigned int count[BITSET_MINIMAL_SIZE];
+			vector<unsigned int> count;
 			//Число временных отсчётов от предыдущего срабатывания
 		};
 

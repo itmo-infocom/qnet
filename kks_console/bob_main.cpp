@@ -82,7 +82,7 @@ int main( void )
 		
 		//В этой точке у нас точно налажена связь с Алисой.
 		//Теперь нам надо перед ней представиться
-		char Im_Bob = BOB;
+		char Im_Bob = bob;
 		int n = send( sock, &Im_Bob, sizeof( Im_Bob ), 0 );
 		if ( n < 0 )
 		{
