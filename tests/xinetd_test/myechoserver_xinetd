@@ -1,0 +1,7 @@
+service myechoserver
+{
+	server 			= /home/avasilev/kks_v2/tests/xinetd_test/a.out
+	socket_type	= stream
+	user				= avasilev
+	protocol		= tcp
+}
