@@ -22,6 +22,13 @@ using namespace std;//Чтобы не указывать это явно пер�
 	
 	#define PRINT(text) cout << "bob_main: " << text << endl;
 
+  //Сохраняет текущую конфигурацию в энергонезависимую память
+  void save_conf( configuration &config)
+  {
+    ofstream file("comfiguration.bin", ios::binary);
+    file.write( (char*)&config, sizeof(config) );
+    file.close();
+  }
 //---------------------------------------
 //Точка входа
 int main( void )

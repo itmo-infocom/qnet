@@ -39,10 +39,29 @@
 
 //-------------------------------------------------------------------
 //Общие функции
-	//Сохраняет текущую конфигурацию config в энергонезависимую память
-		void save_config()
-		{
-			ofstream file( "configuration.bin", ios::binary );
-			file.write( (char *) &config, sizeof( config ));
-			file.close();
-		}
+	  //Выполняет отправку/приём vector<bool> в/из сокета sock
+    bool my_send( int sock, vector<bool> &v)
+    {
+      bool *to_send = new bool[v.size()];
+      for (size_t i = 0; i < v.size(); i++) to_send[i] = v[i];
+
+      //Теперь отправим сформированный to_send по сети, указав в качестве размера именно число бит
+      return send( sock, to_send, v.size(), 0 ) < 0;
+    }
+
+    bool my_recv( int sock, vector<bool> &v)
+    {
+      bool *recieve = nullptr;
+      unsigned int size;
+      int r;//Число принятых байт
+      r = recv( sock, &size, sizeof(size), 0 );//Приняли сколько бит должно придти
+
+      if ( r < 0 ) return false;
+      if ( r < (int)sizeof(size) ) return false;
+
+      r = recv( sock, recieve, sizeof(size), 0 );//Считали это число бит
+      if ( r < 0 ) return false;
+      if ( r < (int)sizeof(size) ) return false;
+
+      return true;
+    }

@@ -24,7 +24,7 @@ int main( void )
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port = htons( 50000 );//Номер порта по умолчанию
-	addr_len = sizeof( config.addr );
+	addr_len = sizeof( addr );
 		
 	while ( true )//start внешний цикл
 	{
@@ -95,7 +95,8 @@ int main( void )
   			{
   				Bob_sock = temp_client;
           //Скажем Бобу, что я - Алиса
-          send( Bob, &device::alice, sizeof(device::alice), 0 );
+          int im_alice = device::alice;
+          send( Bob_sock, &im_alice, sizeof(im_alice), 0 );
   				cout << "Established connection with Bob" << endl;
   			} else
         {
@@ -116,7 +117,7 @@ int main( void )
       
       //Узнаем от Боба в каком режиме мы будем сейчас работать
       int regime;
-      int recv_bytes = recv( Bob_sock, &regime, sizeof(regime), 0 );
+      //int recv_bytes = recv( Bob_sock, &regime, sizeof(regime), 0 );
 			
       //Преположим, что соединение с Бобом абсполютно надёжно, поэтому никаких проверок на ошибки делать не будем
       switch (regime)
@@ -131,7 +132,7 @@ int main( void )
 		}//end рабочий цикл
 		
 		//Не забываем закрыть все соединения
-  	if ( close( Bob ) < 0 )
+  	if ( close( Bob_sock ) < 0 )
     {
       cerr << "alice: Cannot close connection with Bob" << endl;
       break;
