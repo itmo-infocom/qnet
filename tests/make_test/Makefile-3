@@ -1,0 +1,22 @@
+#Компилятор, используемый для сборки
+CC=g++
+
+#Флаги, которые передаём компилятору
+CFLAGS=-c -Wall
+
+all: hello
+
+hello: main.o factorial.o hello.o
+	$(CC) main.o factorial.o hello.o -o hello
+	
+main.o: main.cpp
+	$(CC) $(CFLAGS) main.cpp
+
+factoril.o: factorial.cpp
+	$(CC) $(CFALGS) factorial.cpp
+
+hello.o: hello.cpp
+	$(CC) $(CFLAGS) hello.cpp
+
+clean:
+	rm -f *.0 hello

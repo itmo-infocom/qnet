@@ -10,11 +10,6 @@ using namespace std;//Чтобы не указывать это явно пер�
 //---------------------------------------
 //Глобальные переменные и константы
 	
-  struct configuration
-	{
-		struct sockaddr_in addr;
-		socklen_t addr_len;
-	}	config;
 	
 //---------------------------------------
 //Прототипы функций
@@ -22,118 +17,93 @@ using namespace std;//Чтобы не указывать это явно пер�
 	
 	#define PRINT(text) cout << "bob_main: " << text << endl;
 
-  //Сохраняет текущую конфигурацию в энергонезависимую память
-  void save_conf( configuration &config)
-  {
-    ofstream file("comfiguration.bin", ios::binary);
-    file.write( (char*)&config, sizeof(config) );
-    file.close();
-  }
 //---------------------------------------
 //Точка входа
-int main( void )
+int main( int argc, char **argv )
 {
-	//Конфигурация по умолчанию для сокета
-  {
-    //Попытаемся прочитать конфигурацию из файла
-    ifstream file( "configuration.bin", ios::binary );
-    if (file)
-    {
-      file.read( (char*)&config, sizeof(config) );
-      file.close();
-    } else
-		{
-      cout << "bob: Using default settings" << endl;
-			config.addr.sin_family = AF_INET;
-			char default_hostname[] = "localhost4";
-			struct hostent *server = gethostbyname( default_hostname );
-			if (server == NULL )
-			{
-				cerr 	<< "bob: No such hostname " << default_hostname << endl;
-				return EXIT_FAILURE;
-			}
-				bcopy(
-				(char *) server->h_addr,
-				(char *) &config.addr.sin_addr.s_addr,
-				server->h_length );
-				config.addr.sin_port = htons( 50000 );
-  			config.addr_len = sizeof( config.addr );
-		}
-	}
-
-	while (true)//start внешний цикл
+	while (true)//start Инициализация сокета
 	{
-		//start Инициализация сокета
-		{		
-			//Дескриптор сокета - далее нам надо будет его прослушивать,
-			//чтобы установить связь с Бобом и/или GUI
-			int sock = socket( AF_INET, SOCK_STREAM, 0 );
-
-			if ( sock < 0 )
-			{
-				//В случае неудачи при создании сокета - выбить ошибку и
-				//полностью прекратить работу программы, т.к. это некая
-				//пермаментная проблема
-				cerr << "bob: Cannot create socket" << endl;
-				return EXIT_FAILURE;
-			}
-			
-			while (true)//start цикл socket connect
-			{
-				int Alice_sock, GUI_sock = -1; 
-				//Дескрипторы соединений
-				//По умолчанию GUI к нам не подключён. А вот без Алисы нам никак
-				cout << "bob: Connecting to Alice..." << endl;
-				Alice_sock = connect (
-						sock,
-						(struct sockaddr *) &config.addr,
-						config.addr_len );
-					
-				if (Alice_sock < 0) 
-				{
-					cerr << "bob: Cannot connect to Alice" << endl;
-					sleep(1);
-					continue;
-				}
-			
-				cout << "bob: Successfully connected to Alice" << endl;
-			
-				//В этой точке у нас точно налажена связь с Алисой.
-				//Теперь нам надо перед ней представиться
-	      send( sock, &device::bob, sizeof( device::bob ), 0 );
-        //Также удостоверимся, что мы подключились именно к Алисе
-        {
-          int server;
-          recv( sock, &server, sizeof( device::alice ), 0 );
-          if ( server != device::alice )
-          {
-            cerr << "bob: Connected not to Alice" << endl;
-            close( sock );
-            break;
-          }
-        }
-		
-				//Теперь создадим цикл, в котором будем крутить основной алгоритм работы
-				while (true)//рабочий цикл
-				{
+		//Дескриптор сокета - далее нам надо будет его прослушивать,
+		//чтобы установить связь с Бобом и/или GUI
+		int sock = socket( AF_INET, SOCK_STREAM, 0 );
+		if ( sock < 0 )
+		{
+			//В случае неудачи при создании сокета - выбить ошибку и
+			//полностью прекратить работу программы, т.к. это некая
+			//пермаментная проблема
+			cerr << "bob: Cannot create socket" << endl;
+			return EXIT_FAILURE;
+		}
+    
+    //Конфигурация по умолчанию для сокета
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    socklen_t addr_len;
+    struct hostent *server = gethostbyname( argv[1] );
+    if (server == NULL )
+    {
+      cerr 	<< "bob: No such hostname " <<  argv[1]<< endl;
+      return EXIT_FAILURE;
+    }
+    bcopy(
+      (char *) server->h_addr,
+      (char *) &addr.sin_addr.s_addr,
+      server->h_length );
+    addr.sin_port = htons( 50000 );
+    addr_len = sizeof( addr );
+      		
+		while (true)//start цикл socket connect
+		{
+			int Alice_sock, GUI_sock = -1; 
+			//Дескрипторы соединений
+			//По умолчанию GUI к нам не подключён. А вот без Алисы нам никак
+			cout << "bob: Connecting to Alice..." << endl;
+			Alice_sock = connect ( sock, (struct sockaddr *) &addr,	addr_len );
 				
-					//Внутри этого цикла необходимо размещать весь интеллект,
-					//связанный с работой платы и прочим-прочим
-					
-					return EXIT_SUCCESS;
-					break;
-				}//end рабочий цикл
+			if (Alice_sock < 0) 
+			{
+				cerr << "bob: Cannot connect to Alice" << endl;
+				sleep(1);
+				continue;
+			}
 		
-				close( Alice ) 
-				if ( GUI != - 1 ) close( GUI );
-			}//end цикл socket connect
-			
-			close( sock );
-			
-		}//end Инициализация сокета
+			cout << "bob: Successfully connected to Alice" << endl;
 		
-	}//end Внешний цикл
+			//В этой точке у нас точно налажена связь с Алисой.
+			//Теперь нам надо перед ней представиться
+      int im_bob = device::bob;
+      send( sock, &im_bob, sizeof( im_bob ), 0 );
+      //Также удостоверимся, что мы подключились именно к Алисе
+      {
+        int server;
+        recv( sock, &server, sizeof( device::alice ), 0 );
+        if ( server != device::alice )
+        {
+          cerr << "bob: Connected not to Alice" << endl;
+          close( sock );
+          break;
+        }
+      }
+		
+			//Теперь создадим цикл, в котором будем крутить основной алгоритм работы
+			while (true)//рабочий цикл
+			{
+				//Внутри этого цикла будет размещён весь интеллект,
+				//связанный с работой платы и прочим-прочим
+				
+				return EXIT_SUCCESS;
+				break;
+			}//end рабочий цикл
+
+			close( Alice_sock );
+			if ( GUI != - 1 ) close( GUI );
+
+		}//end цикл socket connect
 	
+	  close( sock );
+			
+  }//end Инициализация сокета
+		
 }//end main()
 
 //--------------------------------------------------

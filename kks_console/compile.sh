@@ -1,6 +1,5 @@
 #!/bin/bash
 
 #mkdir build
-
-g++ -Wall -pthread alice_main.cpp -o build/alice.o -std=c++11
-#g++ -Wall -pthread bob_main.cpp -o build/bob.o -std=c++11
+g++ -Wall -std=c++1y -pthread -l AnB -L ./driverAnB/devel/ alice_main.cpp -o build/alice.o
+g++ -Wall -std=c++1y -pthread -l AnB -L ./driverAnB/devel/ bob_main.cpp -o build/bob
