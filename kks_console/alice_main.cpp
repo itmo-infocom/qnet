@@ -5,14 +5,8 @@ using namespace std;//Чтобы не указывать это явно пер�
 				//одинаковыми и для Алисы, и для Боба
 //---------------------------------------
 //Глобальные переменные и константы
-	struct configuration
-	{
-		struct sockaddr_in addr;
-		socklen_t addr_len;
-	}
-	config, //Рабочая конфигурация, с которой работаем
-	config_default; //Эта конфигурация "по умолчанию" - задействуем её только
-			//когда у нас отсутствует файл конфигурации
+
+
 
 //---------------------------------------
 //Прототипы функций
@@ -24,129 +18,132 @@ using namespace std;//Чтобы не указывать это явно пер�
 //Точка входа
 int main( void )
 {
-	//В этом блоке можно определять различные константы
-	{
-		config_default.addr.sin_family = AF_INET;
-		config_default.addr.sin_addr.s_addr = INADDR_ANY;
-		config_default.addr.sin_port = htons( 50000 );
-		config_default.addr_len = sizeof( config.addr );
-	}	
+	struct sockaddr_in addr;
+	socklen_t addr_len;
+
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_port = htons( 50000 );//Номер порта по умолчанию
+	addr_len = sizeof( config.addr );
 		
 	while ( true )//start внешний цикл
 	{
-		read_config();
-		
 		int sock = socket( AF_INET, SOCK_STREAM, 0 );
 		//Дескриптор сокета - далее нам надо будет его прослушивать,
-		//чтобы установить связь с Бобом и/или GUI
+		//чтобы установить связь с клиентом
 
 		if ( sock < 0 )
 		{
 			//В случае неудачи при создании сокета - выбить ошибку и
 			//полностью прекратить работу программы, т.к. это некая
 			//пермаментная проблема
-			cerr << "alice_main: Cannot create socket" << endl;
+			cerr << "alice: Cannot create socket" << endl;
 			return EXIT_FAILURE;
 		}
 
-		//Обычно
 		if ( bind(
 			sock,
-			(struct sockaddr *) &config.addr,
-			config.addr_len ) < 0 )
+			(struct sockaddr *) &addr,
+			addr_len ) < 0 )
 		{
-			cerr << "alice_main: Cannot bind socket - perhaps, port is busy" << endl;
+			cerr << "alice: Cannot bind socket - perhaps, port is busy" << endl;
 			return EXIT_FAILURE;
 		}
 		
-		
 		//Теперь будем ждать пока к нам кто-нибудь подключится.
 		//Подключиться могут только двое - Боб или GUI:
-		if ( listen( sock, 2 ) < 0 )//Здесь выполнение блочится пока кто-нибудь к нам не постучится
+		if ( listen( sock, 1 ) < 0 )//Здесь выполнение блочится пока кто-нибудь к нам не постучится
 		{
 			//Если даже слушать не можем - то тоже падаем в обморок,
 			//т.к. не знаю допустимо ли такое вообще и при каких условиях
 			//эта ошибка возникает.
-			cerr << "alice_main: Cannot listen socket" << endl;
+			cerr << "alice: Cannot listen socket" << endl;
 			return EXIT_FAILURE;
 		}
 		
-		int Bob = -1, GUI = -1; 
-		//Дескрипторы клиентов
-		//По умолчанию GUI к нам не подключён. А вот без Боба нам никак
+		int Bob_sock = -1;//Файловый дескриптор Боба 
 		
-		while ( Bob == -1 )//Установка соединения с Бобом
-		//Будет крутить этот кусок до тех пор, пока не установим
-		//связь с Бобом
+		while ( Bob_sock == -1 )//start Установка соединения с Бобом
 		{
-			int temp_client = accept(
-				sock,
-				(struct sockaddr *) &config.addr,
-				&config.addr_len );
-			//К нам кто-то подключился - теперь определим кто это и дадим
-			//соответствующее имя.
-			//Для этого установим связь connect() и спросим кто это
-			if ( temp_client < 0 )
-			{
-				cerr << "alice_main: Cannot connect to Bob" << endl;
-				continue;
-			}
-			
-			char who_are_you;
-			int recv_bytes = recv( 
-				temp_client,
-				&who_are_you,
-				sizeof( who_are_you ), 0 );
-				//Подождём пока собеседник представится
-
-			if ( recv_bytes < 0 )
-			{
-				cerr << "alice_main: Couldn't recieve packet" << endl;
-				return EXIT_FAILURE;
-			}
-
-			if ( who_are_you == device::bob ) 
-			{
-				Bob = temp_client;
-				PRINT("Established connection with Bob")
-			}
-			else if ( who_are_you == device::gui ) 
-			{
-				PRINT("Established cnnection with GUI")
-				GUI = temp_client;
-			}
+      //Надо убедиться что это именно Боб
+      {
+  			int temp_client = accept(
+	  			sock,
+	  			(struct sockaddr *) &addr,
+	  			&addr_len );
+	  		//К нам кто-то подключился - теперь определим кто это и дадим
+	  		//соответствующее имя.
+	  		//Для этого установим связь connect() и спросим кто это
+	  		if ( temp_client < 0 )
+	  		{
+	  			cerr << "alice: Cannot connect to Bob" << endl;
+         close( temp_client );
+	  			continue;
+	  		}
+	  		
+	  		int who_are_you;
+	  		int recv_bytes = recv( temp_client,	&who_are_you,	sizeof( who_are_you ), 0 );
+	  		//Подождём пока собеседник представится
+  
+  			if ( recv_bytes < 0 )
+  			{
+  				cerr << "alice: Couldn't recieve packet" << endl;
+  				continue;
+  			}
+  
+  			if ( who_are_you == device::bob ) 
+  			{
+  				Bob_sock = temp_client;
+          //Скажем Бобу, что я - Алиса
+          send( Bob, &device::alice, sizeof(device::alice), 0 );
+  				cout << "Established connection with Bob" << endl;
+  			} else
+        {
+          cerr << "alice: This isn't Bob" << endl;
+          close( temp_client );
+          continue;
+        }
+      }
 		}//end Установка соединения с Бобом
 		
-		//В этой точке у нас точно налажена связь с Бобом
+		//В этой точке у нас налажена связь с Бобом
 
 		//Теперь создадим цикл, в котором будем крутить основной алгоритм
 		//работы
 		while (true)//рабочий цикл
 		{
-		
 			//В теле этого цикла необходимо разместить весь интеллект, касающийся работы самой программы
+      
+      //Узнаем от Боба в каком режиме мы будем сейчас работать
+      int regime;
+      int recv_bytes = recv( Bob_sock, &regime, sizeof(regime), 0 );
 			
-			return EXIT_SUCCESS;
-			
+      //Преположим, что соединение с Бобом абсполютно надёжно, поэтому никаких проверок на ошибки делать не будем
+      switch (regime)
+      {
+        case regimes_list::generation:
+        {
+          //Алгоритм генерации ключа
+
+        }
+        default: continue;
+      }
 		}//end рабочий цикл
 		
 		//Не забываем закрыть все соединения
-		if ( close( Bob ) < 0 )
-		{
-			cerr << "alice_main: Cannot close connection with Bob" << endl;
-			return EXIT_FAILURE;
-		};
-		if ( GUI != -1 ) 
-			if (close( GUI ) < 0)//Может быть и так, что GUI не подключён
-			{
-				cerr << "alice_main: Cannot close connection with GUI" << endl;
-				return EXIT_FAILURE;
-			}
-
-		close( sock );
-		break;
+  	if ( close( Bob ) < 0 )
+    {
+      cerr << "alice: Cannot close connection with Bob" << endl;
+      break;
+    };
+		if ( close( sock ) < 0 )
+    {
+      cerr << "alice: Cannot close socket" << endl;
+      break;
+    };
 	}//end Внешний цикл
-	return EXIT_SUCCESS;
+
+	return EXIT_FAILURE;
 }//end main()
 
 //--------------------------------------------------

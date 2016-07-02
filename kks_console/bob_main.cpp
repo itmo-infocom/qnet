@@ -9,14 +9,12 @@ using namespace std;//Чтобы не указывать это явно пер�
 
 //---------------------------------------
 //Глобальные переменные и константы
-	//Структура configuration хранит в себе всю конфигурацию, которой подчинается программа
-	//Она синхронизирована между Алисой и Бобом
-	struct configuration
+	
+  struct configuration
 	{
 		struct sockaddr_in addr;
 		socklen_t addr_len;
-	}
-	config, config_default;//Глобальная переменная
+	}	config;
 	
 //---------------------------------------
 //Прототипы функций
@@ -29,32 +27,36 @@ using namespace std;//Чтобы не указывать это явно пер�
 int main( void )
 {
 	//Конфигурация по умолчанию для сокета
+  {
+    //Попытаемся прочитать конфигурацию из файла
+    ifstream file( "configuration.bin", ios::binary );
+    if (file)
+    {
+      file.read( (char*)&config, sizeof(config) );
+      file.close();
+    } else
+		{
+      cout << "bob: Using default settings" << endl;
+			config.addr.sin_family = AF_INET;
+			char default_hostname[] = "localhost4";
+			struct hostent *server = gethostbyname( default_hostname );
+			if (server == NULL )
 			{
-				config_default.addr.sin_family = AF_INET;
-				char default_hostname[] = "localhost4";
-				struct hostent *server = gethostbyname( default_hostname );
-				if (server == NULL )
-				{
-					cerr 	<< "bob_main: No such hostname "
-						<< default_hostname << endl;
-					return EXIT_FAILURE;
-				}
-
-				bcopy(
-					(char *) server->h_addr,
-					(char *) &config_default.addr.sin_addr.s_addr,
-					server->h_length );
-
-				config_default.addr.sin_port = htons( 50000 );
-				config_default.addr_len = sizeof( config_default.addr );
+				cerr 	<< "bob: No such hostname " << default_hostname << endl;
+				return EXIT_FAILURE;
 			}
+				bcopy(
+				(char *) server->h_addr,
+				(char *) &config.addr.sin_addr.s_addr,
+				server->h_length );
+				config.addr.sin_port = htons( 50000 );
+  			config.addr_len = sizeof( config.addr );
+		}
+	}
 
-	//Чтение конфигурации из файла
-	read_config();
-	
 	while (true)//start внешний цикл
 	{
-		//Инициализация сокета
+		//start Инициализация сокета
 		{		
 			//Дескриптор сокета - далее нам надо будет его прослушивать,
 			//чтобы установить связь с Бобом и/или GUI
@@ -65,39 +67,44 @@ int main( void )
 				//В случае неудачи при создании сокета - выбить ошибку и
 				//полностью прекратить работу программы, т.к. это некая
 				//пермаментная проблема
-				cerr << "bob_main: Cannot create socket" << endl;
+				cerr << "bob: Cannot create socket" << endl;
 				return EXIT_FAILURE;
 			}
 			
 			while (true)//start цикл socket connect
 			{
-				int Alice, GUI = -1; 
+				int Alice_sock, GUI_sock = -1; 
 				//Дескрипторы соединений
 				//По умолчанию GUI к нам не подключён. А вот без Алисы нам никак
-				PRINT("Connecting to Alice...")
-				Alice = connect (
+				cout << "bob: Connecting to Alice..." << endl;
+				Alice_sock = connect (
 						sock,
 						(struct sockaddr *) &config.addr,
 						config.addr_len );
 					
-				if (Alice < 0) 
+				if (Alice_sock < 0) 
 				{
-					cerr << "bob_main: Cannot connect to Alice" << endl;
+					cerr << "bob: Cannot connect to Alice" << endl;
 					sleep(1);
 					continue;
 				}
 			
-				PRINT("Successfully connected to Alice")
+				cout << "bob: Successfully connected to Alice" << endl;
 			
 				//В этой точке у нас точно налажена связь с Алисой.
-				//Теперь нам надо перед ней представиться, чтобы она не подумала, что мы являемся GUI
-				char Im_Bob = device::bob;
-				int n = send( sock, &Im_Bob, sizeof( Im_Bob ), 0 );
-				if ( n < 0 )
-				{
-					cerr << "bob_main: Cannot send a packet to Alice" << endl;
-					continue;
-				}
+				//Теперь нам надо перед ней представиться
+	      send( sock, &device::bob, sizeof( device::bob ), 0 );
+        //Также удостоверимся, что мы подключились именно к Алисе
+        {
+          int server;
+          recv( sock, &server, sizeof( device::alice ), 0 );
+          if ( server != device::alice )
+          {
+            cerr << "bob: Connected not to Alice" << endl;
+            close( sock );
+            break;
+          }
+        }
 		
 				//Теперь создадим цикл, в котором будем крутить основной алгоритм работы
 				while (true)//рабочий цикл
@@ -108,22 +115,10 @@ int main( void )
 					
 					return EXIT_SUCCESS;
 					break;
-					
 				}//end рабочий цикл
 		
-				//Не забываем закрыть все соединения
-				if (close( Alice ) < 0) 
-				{
-					cerr << "bob_main: Cannot close connection with alice" << endl;
-					return EXIT_FAILURE;
-				}
-				if ( GUI != -1 ) 
-					if (close( GUI ) < 0)//Может быть и так, что GUI не подключён
-					{
-						cerr << "bob_main: Cannot close connection with GUI" << endl;
-						return EXIT_FAILURE;
-					}
-				
+				close( Alice ) 
+				if ( GUI != - 1 ) close( GUI );
 			}//end цикл socket connect
 			
 			close( sock );
