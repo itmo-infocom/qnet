@@ -19,11 +19,9 @@ int main( void )
 	try
 	{
 		NetWork bob("localhost", 50000);
-		
 		//Теперь создадим цикл, в котором будем крутить основной алгоритм
 		//работы
-		bool work_flag = true;
-		while ( work_flag )//рабочий цикл
+		while (true)//рабочий цикл
 		{
 			cout << "alice: Successfully connected with Bob" << endl;
 			break;

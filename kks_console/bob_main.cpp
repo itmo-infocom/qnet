@@ -38,7 +38,9 @@ int main( void )
 		{
 			std::cerr << strerror(errno) << std::endl;
 		}
+
 	}//end Внешний цикл
+	
 }//end main()
 
 //--------------------------------------------------
