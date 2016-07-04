@@ -5,24 +5,27 @@
 
 //-------------------------------------------------------------------
 //Общие константы
-	#define BOB 0
-	#define BITSET_MINIMAL_SIZE 64 	//Размер bitset квантуется с таким размером 
-					//т.е. по 8 байт
+	enum Err
+	{
+		sock_create,
+		sock_send_recv,
+		sock_bind
+	};
+	
+	enum peers
+	{
+		alice,
+		bob,
+		gui,
+		telnet,
+		
+		peers_size
+	};
 //-------------------------------------------------------------------
 //Общие типы данных и структуры
-	//Данная структура предназначена для обмена между Алисой и Бобом
-	//отсчётами, на которых было срабатывание детектора
-		struct detections
-		{
-			bitset<BITSET_MINIMAL_SIZE> basis;//Базис
-			bitset<BITSET_MINIMAL_SIZE> key;
-			//Значение ключа в данном отсчёта
-			bitset<BITSET_MINIMAL_SIZE> special;
-			//Для вычисления QBER или чего-нибудь странного
-
-			unsigned int count[BITSET_MINIMAL_SIZE];
-			//Число временных отсчётов от предыдущего срабатывания
-		};
+	#include "detections.cpp"
+	#include "DMAFrame.cpp"
+	#include "sockets.cpp"
 
 //-------------------------------------------------------------------
 //Общие функции
