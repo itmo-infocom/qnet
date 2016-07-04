@@ -1,6 +1,6 @@
 //Точка входа консольного приложения Алисы
+#include "header.h"
 
-#include "common_header.h"
 //Файл с функциями и компонентами, одинаковыми и для Алисы, и для Боба
 
 //---------------------------------------
@@ -19,8 +19,9 @@ int main( void )
 	//если что-то пошло не так
 	{
 		try
-		{		
-			NetWork server( 3, 50000 );
+		{
+      char port[] = "50000";
+			NetWork server( 3, port );
 			
 			while (!server.IsReady(peers::alice)) sleep(1);
 			

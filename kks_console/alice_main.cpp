@@ -1,7 +1,5 @@
 //Точка входа консольного приложения Алисы
-using namespace std;//Чтобы не указывать это явно перед каждой функцией.
-
-#include "common_header.h"	//Файл с функциями и константами,
+  #include "header.h"	//Файл с функциями и константами,
 				//одинаковыми и для Алисы, и для Боба
 //---------------------------------------
 //Глобальные переменные и константы
@@ -18,12 +16,14 @@ int main( void )
 					//если что-то пошло не так
 	try
 	{
-		NetWork bob("localhost", 50000);
+    char hostname[] = "localhost4";
+    char port[] = "50000";
+		NetWork bob( hostname, port );
 		//Теперь создадим цикл, в котором будем крутить основной алгоритм
 		//работы
 		while (true)//рабочий цикл
 		{
-			cout << "alice: Successfully connected with Bob" << endl;
+			std::cout << "alice: Successfully connected with Bob" << std::endl;
 			break;
 		}//end рабочий цикл
 

@@ -5,28 +5,31 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h> 
 
-#include <types.h>
-#include <net.db>//Для работы gethostbyname()
+#include <sys/types.h>
+#include <netdb.h>//Для работы gethostbyname()
 
 #include <iostream>
 #include <pthread.h>
 #include <linux/futex.h>
 #include <string.h>
 
+static void *acception( void* arg );
+
 //Класс для общения по сети посредством сокета
 class NetWork
 {
-	NetWork( int max_cli, int port, int* clients );
-	NerWork( char* hostname, int port ) { connect( hostname, port); };
+public:
+	NetWork( int max_cli, char *port );
+	NetWork( char* hostname, char *port );
 	~NetWork();
 	
-	void SendCmd( peers p = peers::peers_size, int cmd ) 
+	void SendCmd( int cmd, peers p = peers::peers_size ) 
 		{PrivateSend(p,&cmd,sizeof(cmd));};
-	void SendData( peers p = peers::peers_size, void *cmd, size_t size ) 
+	void SendData( void *cmd, size_t size, peers p = peers::peers_size ) 
 		{PrivateRecv(p,cmd,size);};
-	void RecvCmd( peers p = peers::peers_size, int &cmd ) 
+	void RecvCmd( int &cmd, peers p = peers::peers_size ) 
 		{PrivateSend(p,&cmd,sizeof(cmd));};
-	void RecvData( peers p = peers::peers_size, void *cmd, size_t size )
+	void RecvData( void *cmd, size_t size, peers p = peers::peers_size )
 		{PrivateSend(p,cmd,size);};
 	
 	bool IsReady(int p);//Возвращает - инициализирован ли сокет p
@@ -41,11 +44,10 @@ private:
 	int clients_num;
 	
 	pthread_t thr;
-	pthread_mutex_t mtx_cli;
-	pthread_mutex_init(&mtx_cli, NULL);
-	void *acception( NetWork* );
+	pthread_mutex_t mtx_cli = PTHREAD_MUTEX_INITIALIZER;
+  friend void* acception( void* arg );
 	
-	PrivateSend( peers p, void *cmd, size_t size )
+	void PrivateSend( peers p, void *cmd, size_t size )
 	{
 		int fd;
 		if (p < peers::peers_size) fd = clients[p];
@@ -58,13 +60,15 @@ private:
 				std::cerr << strerror(errno) << std::endl;
 				close(fd);
 			}
-			if ( bytes < size ) 
+			if ( bytes < (int)size )
+      {
 				if (errno == EAGAIN) continue;
 				else throw Err::sock_send_recv;
+      }
 			break;
 		}
 	};
-	PrivateRecv( peers p, void *cmd, size_t size )
+	void PrivateRecv( peers p, void *cmd, size_t size )
 	{
 		int fd;
 		if (p < peers::peers_size) fd = clients[p];
@@ -77,28 +81,48 @@ private:
 				std::cerr << strerror(errno) << std::endl;
 				close(fd);
 			}
-			if ( bytes < size ) 
-				if (errno == EAGAIN) continue;
+			if ( bytes < (int)size ) 
+			{
+        if (errno == EAGAIN) continue;
 				else throw Err::sock_send_recv;
+      }
 			break;
 		}
 	};
+};
+
+//Для создания потока, в котором устанавливается соединение со всеми
+static void* acception( void* arg )
+{
+  NetWork *obj = (NetWork*)arg;
+	while (true)
+	{
+		int client = accept( obj->fd, NULL, NULL );
+		int peer_type;//После установки соединения клиент представляется
+    obj->RecvCmd( peer_type );
+		
+    pthread_mutex_lock(&obj->mtx_cli);
+			if ( peer_type < peers::peers_size ) obj->clients[peer_type] = client;
+			else close(client);
+		pthread_mutex_unlock(&obj->mtx_cli);
+	}
+  return 0;
 }
 
-NetWork::NetWork( int max_cli, int port, int* clients )
+NetWork::NetWork( int max_cli, char* port )
 { 
 	struct addrinfo hints;
-	hints.sin_family = AF_UNSPEC;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags |= AI_PASSIVE;
 	hints.ai_protocol = 0;
 	hints.ai_canonname = NULL;
 	hints.ai_addr = NULL;
-	hints.ai_nex = NULL;
+	hints.ai_next = NULL;
 	
 	struct addrinfo *res = nullptr;
 	
-	if ( int errno = getaddinfo( NULL, port, &hints, &res ) != 0 ) 
+	if ( getaddrinfo( NULL, port, &hints, &res ) != 0 ) 
 	{
 		std::cerr << gai_strerror( errno ) << std::endl;
 		throw errno;
@@ -107,12 +131,12 @@ NetWork::NetWork( int max_cli, int port, int* clients )
 	struct addrinfo *rp;
 	for ( rp = res; rp != NULL; rp = rp->ai_next ) {
 		fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
-		if ( sfd == -1 ) continue;
+		if ( fd == -1 ) continue;
 
-		if ( bind( sfd, rp->ai_addr, rp->ai_addrlen ) == 0 )
+		if ( bind( fd, rp->ai_addr, rp->ai_addrlen ) == 0 )
 			break;                  /* Success */
 
-		close(sfd);
+		close(fd);
 	}
 	
 	if ( rp == NULL ) //Ни один из адресов не подошёл
@@ -126,12 +150,12 @@ NetWork::NetWork( int max_cli, int port, int* clients )
 	clients_num = max_cli;
 	clients = new int[clients_num];
 	cli_types = new int[clients_num];
-	for (int i = 0; i < clients_num; i++) clients = -1;
+	for (int i = 0; i < clients_num; i++) clients[i] = -1;
 	
-	pthread_create( thr, NULL, acception, this );
+	pthread_create( &thr, NULL, &acception, &fd );
 };
 
-NetWork::NetWork( char* hostname, int port )
+NetWork::NetWork( char* hostname, char* port )
 {
 	fd = -1;
 	
@@ -142,15 +166,15 @@ NetWork::NetWork( char* hostname, int port )
 	hints.ai_protocol = 0;
 	
 	struct addrinfo *res = nullptr;
-	
-	if ( int errno = getaddrinfo( "localhost", port, &hosts, &res) != 0 ) 
+
+	if ( getaddrinfo( hostname, port, &hints, &res ) != 0 ) 
 	{
 		std::cerr << gai_strerror( errno ) << std::endl;
 		throw errno;
 	}
 	
-	struct addrinfo *res = nullptr;
-	for ( rp = result; rp != NULL; rp = rp->ai_next ) 
+struct addrinfo *rp;
+	for ( rp = res; rp != NULL; rp = rp->ai_next ) 
 	{
 		fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
 			if ( fd == -1 ) continue;
@@ -173,30 +197,20 @@ NetWork::NetWork( char* hostname, int port )
 NetWork::~NetWork()
 {
 	pthread_cancel(thr);
-	pthread_mutex_destroy(mtx_cli);
+	pthread_mutex_destroy(&mtx_cli);
 	delete clients;
 	delete cli_types;
 }
 
-static void* NetWork::acception( NetWork* obj )
-{
-	while (true)
-	{
-		int client = accept( obj->fd, NULL, NULL );
-		int peer_type;//После установки соединения клиент представляется
-		RecvCmd( peer_type );
-		pthread_mutex_lock(&mtx_cli);
-			if ( peer_type < peers::peers_size ) clients[peer_type] = client;
-			else close(client);
-		pthread_mutex_unlock(&mtx_cli);
-	}
-}
-
-bool IsReady(int p)
+bool NetWork::IsReady(int p)
 {
 	pthread_mutex_lock(&mtx_cli);
 		if (p < peers::peers_size) return clients[p] == -1;
-		else return fd = -1;
+		else 
+    {
+      fd = -1;
+      return fd;
+    }
 	pthread_mutex_unlock(&mtx_cli);
 }
 #endif
