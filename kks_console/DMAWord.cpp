@@ -1,6 +1,6 @@
 //Одно слово DMA и методы работы с ним
-#ifndef __DMAWORD
-#define __DMAWORD
+#ifndef DMAWORD_CPP
+#define DMAWORD_CPP
 
 struct DMAWord
 {

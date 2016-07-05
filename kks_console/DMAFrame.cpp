@@ -1,5 +1,5 @@
-#ifndef __DMAFRAME
-#define __DMAFRAME
+#ifndef DMAFRAME_CPP
+#define DMAFRAME_CPP
 
 #include <vector>
 
@@ -38,7 +38,7 @@ int DMAFrame::find_start_gen(void)
 	for ( bit = 0; bit < 8; bit++ ) if ( memory[w].calibr(bit) != 0 ) break;
 	
 	return w * 8 + bit - 1;
-}
+};
 
 unsigned int DMAFrame::find_detect( unsigned int pos )
 {
@@ -49,7 +49,7 @@ unsigned int DMAFrame::find_detect( unsigned int pos )
 	for ( bit = 0; bit < 8; bit++ ) if ( memory[w].detect(bit) != 0 ) break;
 	
 	return w*8 + bit;
-}
+};
 
 detections DMAFrame::to_detections( peers who_am_i )
 {
@@ -94,12 +94,12 @@ detections DMAFrame::to_detections( peers who_am_i )
 	  }
 
   return ret;
-}
+};
 
 unsigned int DMAFrame::ticks_left_to_end(std::vector<unsigned int> &v)
 {
   unsigned int answer = TICS;
 	for (auto i : v) answer -= i;
   return answer;
-}
+};
 #endif

@@ -1,10 +1,9 @@
-#ifndef __SOCKETS
-#define __SOCKETS
+#ifndef SOCKETS_CPP
+#define SOCKETS_CPP
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h> 
-
 #include <sys/types.h>
 #include <netdb.h>//Для работы gethostbyname()
 
@@ -12,6 +11,10 @@
 #include <pthread.h>
 #include <linux/futex.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
+
+#include "common.cpp"
 
 static void *acception( void* arg );
 
@@ -23,16 +26,16 @@ public:
 	NetWork( char* hostname, char *port );
 	~NetWork();
 	
-	void SendCmd( int cmd, peers p = peers::peers_size ) 
+	void SendCmd( int cmd, int p = peers_size ) 
 		{PrivateSend(p,&cmd,sizeof(cmd));};
-	void SendData( void *cmd, size_t size, peers p = peers::peers_size ) 
+	void SendData( void *cmd, size_t size, peers p = peers_size ) 
 		{PrivateRecv(p,cmd,size);};
-	void RecvCmd( int &cmd, peers p = peers::peers_size ) 
+	void RecvCmd( int &cmd, int p = peers_size ) 
 		{PrivateSend(p,&cmd,sizeof(cmd));};
-	void RecvData( void *cmd, size_t size, peers p = peers::peers_size )
+	void RecvData( void *cmd, size_t size, int p = peers_size )
 		{PrivateSend(p,cmd,size);};
 	
-	bool IsReady(int p);//Возвращает - инициализирован ли сокет p
+	bool IsReady(int p);//Возвращает - подключён ли клиент p
 	
 	enum NetComds
 	{
@@ -47,10 +50,10 @@ private:
 	pthread_mutex_t mtx_cli = PTHREAD_MUTEX_INITIALIZER;
   friend void* acception( void* arg );
 	
-	void PrivateSend( peers p, void *cmd, size_t size )
+	void PrivateSend( int p, void *cmd, size_t size )
 	{
 		int fd;
-		if (p < peers::peers_size) fd = clients[p];
+		if (p < peers_size) fd = clients[p];
 		int bytes = 0;
 		while (true)
 		{
@@ -63,15 +66,15 @@ private:
 			if ( bytes < (int)size )
       {
 				if (errno == EAGAIN) continue;
-				else throw Err::sock_send_recv;
+				else throw sock_send_recv;
       }
 			break;
 		}
 	};
-	void PrivateRecv( peers p, void *cmd, size_t size )
+	void PrivateRecv( int p, void *cmd, size_t size )
 	{
 		int fd;
-		if (p < peers::peers_size) fd = clients[p];
+		if (p < peers_size) fd = clients[p];
 		int bytes = 0;
 		while (true)
 		{
@@ -84,7 +87,7 @@ private:
 			if ( bytes < (int)size ) 
 			{
         if (errno == EAGAIN) continue;
-				else throw Err::sock_send_recv;
+				else throw sock_send_recv;
       }
 			break;
 		}
@@ -102,7 +105,7 @@ static void* acception( void* arg )
     obj->RecvCmd( peer_type );
 		
     pthread_mutex_lock(&obj->mtx_cli);
-			if ( peer_type < peers::peers_size ) obj->clients[peer_type] = client;
+			if ( peer_type < peers_size ) obj->clients[peer_type] = client;
 			else close(client);
 		pthread_mutex_unlock(&obj->mtx_cli);
 	}
@@ -139,7 +142,7 @@ NetWork::NetWork( int max_cli, char* port )
 		throw errno;
 	}
 
-	struct addrinfo *rp;
+	struct addrinfo *rp;//указатель на один из вариантов, к кому подключаться
 	for ( rp = res; rp != NULL; rp = rp->ai_next ) {
 		fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
 		if ( fd == -1 ) continue;
@@ -183,8 +186,12 @@ NetWork::NetWork( char* hostname, char* port )
 		std::cerr << gai_strerror( errno ) << std::endl;
 		throw errno;
 	}
-	
-struct addrinfo *rp;
+
+struct addrinfo *rp;//Результат у
+
+//Цикл на число попыток
+for (int trying = 0; trying < 10; trying++)
+{
 	for ( rp = res; rp != NULL; rp = rp->ai_next ) 
 	{
 		fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
@@ -195,9 +202,11 @@ struct addrinfo *rp;
 
 		close(fd);
 	}
+	sleep(1);
+}
 	
 	if (rp == NULL) 
-	{               /* Ни один из адресов не подошёл */
+	{               /* Ни один из адресов за все попытки не подошёл */
 		std::cerr << "Could not connect" << std::endl;
 		throw Err::sock_connect;
 	}
@@ -223,5 +232,5 @@ bool NetWork::IsReady(int p)
       return fd;
     }
 	pthread_mutex_unlock(&mtx_cli);
-}
+};
 #endif
