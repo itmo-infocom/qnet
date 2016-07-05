@@ -12,24 +12,16 @@
             "suppressTaskName": true,
             "isBuildCommand": true,
             "showOutput": "always",
-<<<<<<< HEAD
-            "args": ["g++ -Wall -std=c++11 -g -pthread alice_main.cpp -o alice.out"]
-=======
             "args": ["g++ -Wall -std=c++11 -g -pthread alice_main.cpp -o alice.out"],
             "echoCommand": true
->>>>>>> master
         },
         {
             "taskName": "Build bob",
             "suppressTaskName": true,
             "isBuildCommand": true,
             "showOutput": "always",
-<<<<<<< HEAD
-            "args": ["g++ -Wall -std=c++11 -g -pthread bob_main.cpp -o bob.out"]
-=======
             "args": ["g++ -Wall -std=c++11 -g -pthread bob_main.cpp -o bob.out"],
             "echoCommand": true
->>>>>>> master
         }
     ]
 }
