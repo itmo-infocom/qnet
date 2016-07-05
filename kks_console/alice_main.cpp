@@ -12,6 +12,12 @@
 //Точка входа
 int main( void )
 {
+	try{
+		
+	} catch(...)
+	{
+
+	}
 	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
 					//если что-то пошло не так
 	try
@@ -24,6 +30,7 @@ int main( void )
 		while (true)//рабочий цикл
 		{
 			std::cout << "alice: Successfully connected with Bob" << std::endl;
+			
 			break;
 		}//end рабочий цикл
 

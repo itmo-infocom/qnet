@@ -1,5 +1,5 @@
-#ifndef __DETECTIONS
-#define __DETECTIONS
+#ifndef DETECTIONS_CPP
+#define DETECTIONS_CPP
 
 #include <vector>
 
