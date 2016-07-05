@@ -2,31 +2,32 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C++ Launch (GDB)",
+            "name": "Alice debug",
             "type": "cppdbg",
             "request": "launch",
             "launchOptionType": "Local",
             "targetArchitecture": "x64",
-            "program": "enter program name, for example ${workspaceRoot}/a.out",
+            "program": "${workspaceRoot}/alice.out",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
-            "externalConsole": true
+            "externalConsole": true,
+            "preLaunchTask": "Build alice"
         },
         {
-            "name": "C++ Attach (GDB)",
+            "name": "Bob debug",
             "type": "cppdbg",
             "request": "launch",
             "launchOptionType": "Local",
             "targetArchitecture": "x64",
-            "program": "enter program name, for example ${workspaceRoot}/a.out",
+            "program": "${workspaceRoot}/bob.out",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
-            "processId": "enter program's process ID",
-            "externalConsole": false
+            "externalConsole": true,
+            "preLaunchTask": "Build bob"
         }
     ]
 }

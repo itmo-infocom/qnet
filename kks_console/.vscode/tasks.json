@@ -1,0 +1,25 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "0.1.0",
+    "command": "bash",
+    "isShellCommand": true,
+    "args": ["-c"],
+    "showOutput": "always",
+    "tasks": [
+        {
+            "taskName": "Build alice",
+            "suppressTaskName": true,
+            "isBuildCommand": true,
+            "showOutput": "always",
+            "args": ["g++ -Wall -std=c++11 -g -pthread alice_main.cpp -o alice.out"]
+        },
+        {
+            "taskName": "Build bob",
+            "suppressTaskName": true,
+            "isBuildCommand": true,
+            "showOutput": "always",
+            "args": ["g++ -Wall -std=c++11 -g -pthread bob_main.cpp -o bob.out"]
+        }
+    ]
+}

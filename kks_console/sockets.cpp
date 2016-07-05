@@ -122,9 +122,20 @@ NetWork::NetWork( int max_cli, char* port )
 	
 	struct addrinfo *res = nullptr;
 	
-	if ( getaddrinfo( NULL, port, &hints, &res ) != 0 ) 
+	int e = getaddrinfo( NULL, port, &hints, &res );
+	
+	if ( e != 0 ) 
 	{
 		std::cerr << gai_strerror( errno ) << std::endl;
+		switch (e)
+		{
+			case EAI_ADDRFAMILY:break;
+			case EAI_AGAIN:break;
+			case EAI_ALLDONE:break;
+			case EAI_BADFLAGS:break;
+			case EAI_FAIL:break;
+			case EAI_SERVICE:break;
+		}
 		throw errno;
 	}
 
