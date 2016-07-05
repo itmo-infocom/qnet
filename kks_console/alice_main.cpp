@@ -19,11 +19,16 @@ int main( void )
 
 	struct device_list boards;//Здесь хранятся указателя на все обнаруженные устройства
 	try{
-		AnBDriverAPI::GetDevicesList(boards);
+		if (!AnBDriverAPI::GetDevicesList(boards)) 
+		{
+			cerr << boards.array[0].dev_ref->LastError() << endl;
+		}
 	} catch(...)
 	{
 
 	}
+	AnBDriverAPI &board = *boards.array[0].dev_ref;
+	
 
 	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
 					//если что-то пошло не так
