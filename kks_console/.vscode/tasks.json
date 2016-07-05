@@ -12,7 +12,7 @@
             "suppressTaskName": true,
             "isBuildCommand": true,
             "showOutput": "always",
-            "args": ["g++ -Wall -std=c++11 -g -pthread alice_main.cpp -o alice.out"],
+            "args": ["./build_alice.sh"],
             "echoCommand": true
         },
         {
@@ -20,7 +20,7 @@
             "suppressTaskName": true,
             "isBuildCommand": true,
             "showOutput": "always",
-            "args": ["g++ -Wall -std=c++11 -g -pthread bob_main.cpp -o bob.out"],
+            "args": ["./build_bob.sh"],
             "echoCommand": true
         }
     ]

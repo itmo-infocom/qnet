@@ -12,12 +12,19 @@
 //Точка входа
 int main( void )
 {
+	using namespace std;
+	using namespace AnB;
+
+	//Инициализация платы
+
+	struct device_list boards;//Здесь хранятся указателя на все обнаруженные устройства
 	try{
-		
+		AnBDriverAPI::GetDevicesList(boards);
 	} catch(...)
 	{
 
 	}
+
 	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
 					//если что-то пошло не так
 	try
