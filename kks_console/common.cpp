@@ -26,6 +26,7 @@
 	#include "detections.cpp"
 	#include "DMAFrame.cpp"
 	#include "sockets.cpp"
+	#include "board_if.cpp"
 
 //-------------------------------------------------------------------
 //Общие функции
