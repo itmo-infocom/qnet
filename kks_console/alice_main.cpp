@@ -26,18 +26,25 @@ int main( void )
 		try{
 			if (!AnBDriverAPI::GetDevicesList(boards)) throw errno;
 			board = boards.array[0].dev_ref;
+			if (!board->DMADisable())
+			{
+				if (errno != EINVAL)
+				{
+					cerr << board->LastError() << endl;
+					throw errno;
+				} else errno = 0;
+			};	
 			if (!board->SetDev(Alice)) 
 			{
 				cerr << board->LastError() << endl;
 				board->~AnBDriverAPI();
 				continue;
 			} else break;
-		} catch(int e)
+		} catch( int e)
 		{
 			cerr << boards.array[0].dev_ref->LastError() << endl;
 			cerr << strerror(e) << endl;
 		}
-		
 	};
 
 	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
@@ -89,9 +96,9 @@ void generation(AnB::AnBDriverAPI &board)
 	//std::cout << "TableRNG" << std::endl;
 	//std::cout << board.GetDump(BAR1_RNG);
 	//board.DMADisable();
-	//std::cout << "DMAEnable = " << board.DMAEnable() << std::endl;
+	std::cout << "DMAEnable = " << board.DMAEnable() << std::endl;
 	char *buf;
-	for (int i = 0; i < 16; i++) board.DMARead(buf);
+	board.DMARead(buf);
 
 	while (true)
 	{
