@@ -54,20 +54,26 @@ class QuantumSwitchController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(QuantumSwitchController, self).__init__(req, link, data, **config)
         self.simpl_switch_spp = data[simple_switch_instance_name]
+
         #self._set_logger()
         #self.logger.info("dir(data): " + `dir(data)`)
+
         self.dpset = self.simpl_switch_spp.data['dpset']
 
-        self.dst = {"nw":"10.1.1.2", "tp":1000}
-        self.channels = {1:{"dpid":3,
-                            "transp": {"nw":"10.1.1.3", "tp":"1000", "dl":"00:00:00:00:00:03", "iport":1, "oport":3},
-                            "scrypt": {"nw":"10.1.1.3", "tp":"1001", "dl":"00:00:00:00:00:03", "iport":1, "oport":3},
-                            "qcrypt": {"nw":"10.1.1.3", "tp":"1002", "dl":"00:00:00:00:00:03", "iport":1, "oport":3}},
-                         2:{"dpid":4,
-                            "transp": {"nw":"10.1.1.5", "tp":"1000", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4},
-                            "scrypt": {"nw":"10.1.1.5", "tp":"1001", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4},
-                            "qcrypt": {"nw":"10.1.1.5", "tp":"1002", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4}}
-                         }
+        #self.dst = {"nw":"10.1.1.2", "tp":1000}
+        #self.channels = {1:{"dpid":3,
+        #                    "transp": {"nw":"10.1.1.3", "tp":"1000", "dl":"00:00:00:00:00:03", "iport":1, "oport":3},
+        #                    "scrypt": {"nw":"10.1.1.3", "tp":"1001", "dl":"00:00:00:00:00:03", "iport":1, "oport":3},
+        #                    "qcrypt": {"nw":"10.1.1.3", "tp":"1002", "dl":"00:00:00:00:00:03", "iport":1, "oport":3}},
+        #                 2:{"dpid":4,
+        #                    "transp": {"nw":"10.1.1.5", "tp":"1000", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4},
+        #                    "scrypt": {"nw":"10.1.1.5", "tp":"1001", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4},
+        #                    "qcrypt": {"nw":"10.1.1.5", "tp":"1002", "dl":"52:54:00:D2:CB:9F", "iport":3, "oport":4}}
+        #                 }
+
+        jsondict = json.load(open(qpath+"channels.json"))
+        self.dst = jsondict["dst"]
+        self.channels = jsondict["channels"]
 
         #for channel in self.channels.keys():
         #    c = self.channels[channel]
@@ -99,7 +105,11 @@ class QuantumSwitchController(ControllerBase):
     def qchannel(self, req, **kwargs):
 
         simple_switch = self.simpl_switch_spp
-        channel = int(kwargs['channel'])
+
+        #channel = int(kwargs['channel'])
+        # In JSON file channel number is the key (string)
+        channel = kwargs['channel']
+
         status = int(kwargs['status'])
         result = -1
         
