@@ -16,12 +16,16 @@
 		std::vector<unsigned int> count;
 		//Число временных отсчётов от предыдущего срабатывания
 		
-		void push_back( detections &other )
+		//Добавляет другой объект detections
+		void append( detections other )
 		{
-			for ( auto i : other.basis ) basis.push_back(i);
-			for ( auto i : other.key ) key.push_back(i);
-			for ( auto i : other.special ) special.push_back(i);
-			for ( auto i : other.count ) count.push_back(i);
+			other.count[0] += count.back();//Сшивка двух массивов
+			count.pop_back();
+
+			basis.insert(basis.end(), other.basis.begin(), other.basis.end());
+			key.insert(key.end(), other.key.begin(), other.key.end());
+			special.insert(special.end(), other.special.begin(), other.special.end());
+			count.insert(count.end(), other.count.begin(), other.count.end());
 		};
 	};
-#endif
+#endif // !DETECTIONS_CPP

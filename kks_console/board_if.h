@@ -4,9 +4,11 @@
 #define BOARD_IF_CPP
 
 #include <string>
+#include <time.h>
 
 #include "./driverAnB/devel/AnBDefs.h"
 #include "./driverAnB/devel/driver.h"
+#include "DMAFrame.h"
 
 namespace board_if
 {
@@ -41,21 +43,41 @@ using namespace std;
             LVDS_CALIBR_REVERS = 0x80000000
         };
     public:
-        board_if();
+        struct except{
+            public:
+            string errstr;
+            except(string e) //e - имя метода, вызвавшего ошибку
+            {
+                errstr = e; e += ": ";
+
+                error errstruct;
+                AnBDriverAPI::GlobalError(errstruct);
+
+                e += AnBDriverAPI::ErrorStr(errstruct);
+            };
+        };
+
+        board_if() throw(except);
         ~board_if();
+
+        //Возвращает detections за t миллисекунд
+        detections get_detect(float t);
+
+        //Записывает таблицу случайных чисел из вектора
+        void TableRNG(vector<unsigned short int> table);
     };
 
-    board_if::board_if()
+    board_if::board_if() throw(except)
     {
-        try {
-            if (true || !GetDevicesList(devices))
-                throw std::string(LastError());
-        } catch(...) {throw;}
+        if (!GetDevicesList(devices))
+            throw except("GetDeviceList");
 
         //Определим какого типа плата у нас
         AnBRegInfo reg;
         reg.address = AnBRegs::RegMode;
-        devices.array[0].dev_ref->RegRawRead(reg);
+        if (!devices.array[0].dev_ref->RegRawRead(reg))
+        throw except("RegRawRed");
+
         type = reg.value.mode.mode;
         if (type)
         {
@@ -72,16 +94,57 @@ using namespace std;
 
         //Принудительно выключим DMA регистром ПЛИС
         reg.address = AnBRegs::RegDMA;
-        top->RegRawRead(reg);
+        if (!top->RegRawRead(reg)) throw except("RegRawRead/top");
         reg.value.dma.enabled = 0;
-        top->RegRawWrite(reg);
-        if (type) bottom->RegRawWrite(reg);
-
-        //
+        if (!top->RegRawWrite(reg)) throw except("RegRawWrite/top");
+        if (type) 
+        if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
     }
 
     board_if::~board_if()
     {
+    }
+
+    detections board_if::get_detect(float t)
+    {
+        //Исходим из предположения, что плата не запущена и не включен DMA
+        //Также исходим из предположения, что TableRNG уже сконфигурирована как надо
+        //Инициализируем DMA
+        top->DMAEnable();
+        AnBRegInfo reg;
+        reg.value.raw = 1;
+        reg.address = AnBRegs::RegDMA;
+        detections answer;
+        top->RegRawWrite(reg);//Стартовал DMA
+        
+        clock_t start = clock();
+        while ((clock()-start)/(CLOCKS_PER_SEC*1e-3) < t)
+        {
+            char *buf;
+            top->DMARead(buf);
+            answer.append(DMAFrame::DMAFrame(buf).to_detections(type));
+        }
+        reg.value.raw = 0;
+        top->RegRawWrite(reg);//Остановили DMA
+
+        if (type) 
+            answer.count.pop_back();//Удалим последний элемент, который используется для сшивки. Актуально только для Боба
+
+        return answer;
+    };
+
+    void board_if::TableRNG(std::vector<unsigned short int> t)
+    {
+        using namespace std;
+        size_t buf_size = t.size()/4 + (t.size()%4)?1:0;
+        char *buf = new char[buf_size];
+        for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
+        for (size_t i = 0; i < t.size(); i++)
+        buf[i/4] |= (t[i] >> i%4) & 0b11;
+
+        top->WriteTable(buf, buf_size, DestTables::TableRNG);
+
+        delete buf;
     }
 };
 
