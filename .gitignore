@@ -67,3 +67,4 @@ target/
 
 #C++ executable files
 *.out
+*.o

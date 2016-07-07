@@ -4,6 +4,7 @@
 
 //-------------------------------------------------------------------
 //Общие константы
+	//Коды ошибок
 	enum Err
 	{
 		sock_create,
@@ -12,6 +13,7 @@
     sock_connect
 	};
 	
+	//Перечисление всех видов клиентов
 	enum peers
 	{
 		alice,
@@ -23,12 +25,12 @@
 	};
 //-------------------------------------------------------------------
 //Общие типы данных и структуры
-	#include "detections.cpp"
-	#include "DMAFrame.cpp"
-	#include "sockets.cpp"
-	#include "board_if.cpp"
+	//#include "detections.cpp"
+	//#include "DMAFrame.cpp"
+	//#include "sockets.cpp"
+	#include "board_if.h"
 
 //-------------------------------------------------------------------
 //Общие функции
 
-#endif
+#endif // ! COMMON_CPP

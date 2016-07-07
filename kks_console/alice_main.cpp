@@ -11,9 +11,9 @@
 //---------------------------------------
 //Точка входа
 int main( void )
-{
+try{
 	using namespace std;
-	using namespace board_if;
+	board_if::board_if brd;
 
 	while ( true )	//Самый внешний цикл - заставляет повториться всю программу,
 					//если что-то пошло не так
@@ -26,7 +26,7 @@ int main( void )
 		//работы
 		while (true)//рабочий цикл
 		{
-			std::cout << "alice: Successfully connected with bob_sock" << std::endl;
+			cout << "alice: Successfully connected with bob_sock" << endl;
 			break;
 		}//end рабочий цикл
 
@@ -34,10 +34,14 @@ int main( void )
 	}//end Внешний цикл
 	catch (int errno)
 	{
-		std::cerr << strerror(errno) << std::endl;
+		cerr << strerror(errno) << endl;
 	};
 	return EXIT_SUCCESS;
 }//end main()
-
+catch(std::string estr)
+{
+	std::cerr << estr << std::endl; 
+	return EXIT_FAILURE;
+}
 //--------------------------------------------------
 //Определения функций Алисы
