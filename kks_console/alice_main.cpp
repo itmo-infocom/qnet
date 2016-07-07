@@ -14,7 +14,7 @@
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 //Алгоритм генерации ключа
-void gen_key(board_if::board_if &brd, NetWork::NetWork &bob) throw();
+void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw();
 
 //Приводит сплошной массив Алисы к разреженному как у Боба
 detections raw_detect_to_count(detections &alice, detections &bob);
@@ -34,7 +34,7 @@ int main( void )
 			switch (regime)
 			{
 				default:
-				gen_key(brd, bob);
+				gen_key_alg(brd, bob);
 				break;
 			}
 		}
@@ -51,7 +51,7 @@ int main( void )
 	}
 }
 
-void gen_key(board_if::board_if &brd, NetWork::NetWork &bob) throw()
+void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw()
 {
 	using namespace std;
 	//Запишем таблицу случайных чисел

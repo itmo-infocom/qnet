@@ -7,6 +7,14 @@
 
 const double max_qber = 6.5e-2;
 
+//Режимы работы
+enum regimes
+{
+	gen_key,
+
+	regimes_size
+};
+
 std::vector<bool> sift_key(const detections &my, const detections &other, double &qber)
 {
 	using namespace std;
