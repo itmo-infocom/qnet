@@ -45,14 +45,14 @@ namespace NetWork
 				PrivateSend(p, pcmd, sizeof(cmd));
 			};
 		void Send( void *cmd, size_t size, peers p = peers_size ) 
-			{PrivateRecv(p, cmd, size);};
+			{PrivateSend(p, cmd, size);};
 		void Recv( int &cmd, int p = peers_size ) 
 			{
 				void *pcmd = &cmd;
-				PrivateSend(p, pcmd, sizeof(cmd));
+				PrivateRecv(p, pcmd, sizeof(cmd));
 			};
 		void Recv( void *&cmd, size_t size, peers p = peers_size )
-			{PrivateSend(p, cmd, size);};
+			{PrivateRecv(p, cmd, size);};
 		
 		void Send(std::vector<bool> &v, peers p = peers_size);
 		void Recv(std::vector<bool> &v, peers p = peers_size);
@@ -86,28 +86,34 @@ namespace NetWork
 		char *hostname;//Адрес хоста для подключения
 		int max_cli;//Максимальное число подключенных клиентов
 		char *port;//Номер порта или имя сервиса (напр.ftp, http)  в виде текстовой строки (напр."50000" иди "google.com")
+		bool server;//Определяет тип сокета - сервер или клиент
 		
-		pthread_t thr;
-		pthread_mutex_t mtx_cli = PTHREAD_MUTEX_INITIALIZER;
+		pthread_t thread_acception;//поток, в котором слушается сокет на входящие соединения
+		pthread_mutex_t mtx_cli_list = PTHREAD_MUTEX_INITIALIZER;//Блокировка списка дескрипторов клиентов
+		pthread_mutex_t mtx_server = PTHREAD_MUTEX_INITIALIZER;//Блокировка на соединение с сервером
 		friend void* acception( void* arg );
 		
-		void PrivateSend( int p, void *&cmd, size_t size )
+		void PrivateSend( int p, void *cmd, size_t size ) throw(except)
 		{
 			//TODO: Сделать так, чтобы при разрыве после восстановления соединения всё продолжналось с того же места
 			int fd;
 			if (p < peers_size) fd = clients[p];
 			while (true)
-				if (send( fd, &cmd, size, MSG_WAITALL ) > 0) break;
-					else NetWork(hostname, port);
+			if (send(fd, cmd, size, MSG_WAITALL) == -1) throw except("NetWork send");
+			else break;
 		};
 
 		void PrivateRecv( int p, void *&cmd, size_t size )
 		{
 			int fd;
+			cmd = new unsigned char [size];
 			if (p < peers_size) fd = clients[p];
 			while (true)
-				if (recv( fd, &cmd, size, MSG_WAITALL ) > 0) break;
-					else NetWork(hostname, port);
+				if (recv( fd, cmd, size, MSG_WAITALL ) != -1) break;
+					else {
+						if (server) sleep(1);
+						else NetWork(hostname, port);
+					}
 		};
 	};
 
@@ -118,13 +124,14 @@ namespace NetWork
 			while (true)
 			{
 				int client = accept( obj->fd, NULL, NULL );
-				int peer_type;//После установки соединения клиент представляется
-			obj->Recv( peer_type );
+				int *peer_type;
+				//После установки соединения клиент представляется
+				recv(client, peer_type, sizeof(int), MSG_WAITALL);
 				
-			pthread_mutex_lock(&obj->mtx_cli);
-					if ( peer_type < peers_size ) obj->clients[peer_type] = client;
+				pthread_mutex_lock(&obj->mtx_cli_list);
+				if ( *peer_type < peers_size ) obj->clients[*peer_type] = client;
 					else close(client);
-				pthread_mutex_unlock(&obj->mtx_cli);
+				pthread_mutex_unlock(&obj->mtx_cli_list);
 			}
 		return 0;
 	}
@@ -132,6 +139,7 @@ namespace NetWork
 	NetWork::NetWork( int _max_cli, char* _port )
 	{ 
 		max_cli = _max_cli;
+		server = true;
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
@@ -149,7 +157,8 @@ namespace NetWork
 		struct addrinfo *rp;//указатель на один из вариантов, к кому подключаться
 		for ( rp = res; rp != NULL; rp = rp->ai_next ) {
 			fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
-			if ( fd == -1 ) continue;
+			if ( fd == -1 ) 
+				continue;
 
 			if ( bind( fd, rp->ai_addr, rp->ai_addrlen ) == 0 )
 				break;                  /* Success */
@@ -161,13 +170,14 @@ namespace NetWork
 			throw except("bind");
 		
 		freeaddrinfo(res);
+		listen(fd, _max_cli);
 		
-		clients_num = _max_cli;
+		clients_num = 0;
 		clients = new int[clients_num];
 		cli_types = new int[clients_num];
 		for (int i = 0; i < clients_num; i++) clients[i] = -1;
 		
-		pthread_create( &thr, NULL, &acception, &fd );
+		pthread_create( &thread_acception, NULL, &acception, &fd );
 	};
 
 	NetWork::NetWork( char* _hostname, char* _port )
@@ -175,6 +185,7 @@ namespace NetWork
 		fd = -1;
 		hostname = _hostname;
 		port = _port;
+		server = false;
 		
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
@@ -189,21 +200,25 @@ namespace NetWork
 		
 		struct addrinfo *rp;//Результат у
 
-		while(true)
+		while(fd == -1)
 		{
 			for ( rp = res; rp != NULL; rp = rp->ai_next ) 
 			{
 				fd = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol );
-					if ( fd == -1 ) continue;
+					if ( fd == -1 )
+					 continue;
 
 					if (connect(fd, rp->ai_addr, rp->ai_addrlen) != -1 )
 						break;                  /* Успех */
 
 				close(fd);
+				fd = -1;
+				sleep(1);
 			}
-			sleep(1);
 		}
 		
+
+
 		if (rp == NULL) /* Ни один из адресов за все попытки не подошёл */
 			throw except("Cannot connect");
 
@@ -212,8 +227,8 @@ namespace NetWork
 
 	NetWork::~NetWork()
 	{
-		pthread_cancel(thr);
-		pthread_mutex_destroy(&mtx_cli);
+		pthread_cancel(thread_acception);
+		pthread_mutex_destroy(&mtx_cli_list);
 		delete clients;
 		delete cli_types;
 	};
@@ -287,14 +302,14 @@ namespace NetWork
 
 	bool NetWork::IsReady(int p)
 	{
-		pthread_mutex_lock(&mtx_cli);
+		pthread_mutex_lock(&mtx_cli_list);
 			if (p < peers::peers_size) return clients[p] == -1;
 			else 
 		{
 		fd = -1;
 		return fd;
 		}
-		pthread_mutex_unlock(&mtx_cli);
+		pthread_mutex_unlock(&mtx_cli_list);
 	};
 }
 #endif

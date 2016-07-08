@@ -5,9 +5,10 @@
 
 #include <string>
 #include <time.h>
+#include <iostream>
 
-#include "./driverAnB/devel/AnBDefs.h"
-#include "./driverAnB/devel/driver.h"
+#include "./driverAnB/src/lib/AnBDefs.h"
+#include "./driverAnB/src/lib/driver.h"
 #include "DMAFrame.h"
 
 namespace board_if
@@ -15,9 +16,10 @@ namespace board_if
 using namespace AnB;
 using namespace std;
 
-    class board_if: public AnBDriverAPI
+    class board_if: protected AnBDriverAPI
     {
         bool type;//Тип устройства
+        bool DMAStatus;
         device_list devices;//Список всех подключённых устройства
         AnBDriverAPI *top, *bottom;//Верхняя и нижняя платы
         enum reg_map
@@ -42,15 +44,17 @@ using namespace std;
             LVDS_CALIBR_MAX_MASK = 0xFF,
             LVDS_CALIBR_REVERS = 0x80000000
         };
+
+        std::vector<DMAFrame> DMAFrames;
     public:
         struct except{
+            private:
+            struct error errstruct;
             public:
             string errstr;
             except(string e) //e - имя метода, вызвавшего ошибку
             {
                 errstr = e; e += ": ";
-
-                error errstruct;
                 AnBDriverAPI::GlobalError(errstruct);
 
                 e += AnBDriverAPI::ErrorStr(errstruct);
@@ -65,6 +69,13 @@ using namespace std;
 
         //Записывает таблицу случайных чисел из вектора
         void TableRNG(vector<unsigned short int> table);
+
+        //Устанавливает или считывает статус DMA
+        bool GetDMA() {return DMAStatus;};
+        void SetDMA(bool status);
+
+        //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
+        void StoreDMA(double t);
     };
 
     board_if::board_if() throw(except)
@@ -76,7 +87,7 @@ using namespace std;
         AnBRegInfo reg;
         reg.address = AnBRegs::RegMode;
         if (!devices.array[0].dev_ref->RegRawRead(reg))
-        throw except("RegRawRed");
+        throw except("RegRawRead");
 
         type = reg.value.mode.mode;
         if (type)
@@ -93,16 +104,21 @@ using namespace std;
         }
 
         //Принудительно выключим DMA регистром ПЛИС
-        reg.address = AnBRegs::RegDMA;
-        if (!top->RegRawRead(reg)) throw except("RegRawRead/top");
         reg.value.dma.enabled = 0;
+        reg.address = AnBRegs::RegDMA;
         if (!top->RegRawWrite(reg)) throw except("RegRawWrite/top");
         if (type) 
-        if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
+            if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
+        DMAStatus = false;
     }
 
     board_if::~board_if()
     {
+        if (DMAStatus)
+        {
+            top->DMADisable();
+            if (type) bottom->DMADisable();
+        }
     }
 
     detections board_if::get_detect(float t)
@@ -144,8 +160,53 @@ using namespace std;
         buf[i/4] |= (t[i] >> i%4) & 0b11;
 
         top->WriteTable(buf, buf_size, DestTables::TableRNG);
+        if (type) bottom->WriteTable(buf, buf_size, DestTables::TableRNG);
 
         delete buf;
+    }
+
+    void board_if::SetDMA(bool status)
+    {
+        if (status == DMAStatus) return; 
+
+        if (status) top->DMAEnable();
+        else top->DMADisable();
+
+        AnBRegInfo reg;
+        reg.address = AnBRegs::RegDMA;
+        reg.value.dma.enabled = status;
+        top->RegRawWrite(reg);
+        
+        DMAStatus = status;
+    }
+
+    void board_if::StoreDMA(double t)
+    {
+        //Дёрнем регистром DMA, чтобы ПЛИС начала вещание
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegDMA;
+            reg.value.dma.enabled = 1;
+            top->RegRawWrite(reg);
+            reg.value.dma.enabled = 0;
+            top->RegRawWrite(reg);
+        }
+        
+        if (!DMAStatus) top->DMAEnable();
+
+        clock_t start = clock();
+        vector<char*> buffers;
+
+        while ((start-clock())/(CLOCKS_PER_SEC*1e-3) < t)
+        {
+            buffers.push_back(nullptr);
+            char *buf;
+            top->DMARead(buf);
+            buffers.push_back(buf);
+            cout << buffers.size() << endl;
+        }
+
+        top->DMADisable();
     }
 };
 

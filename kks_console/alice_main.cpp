@@ -18,6 +18,7 @@ void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw();
 
 //Приводит сплошной массив Алисы к разреженному как у Боба
 detections raw_detect_to_count(detections &alice, detections &bob);
+void brd_test(board_if::board_if &brd);
 
 //---------------------------------------
 //Точка входа
@@ -26,9 +27,11 @@ int main( void )
 	using namespace std;
 	try{
 		board_if::board_if brd;
+		brd_test(brd);
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::NetWork bob(hostname, port);
+		bob.Send(NetWork::peers::alice);
 		while (true)
 		{
 			int regime;
@@ -120,4 +123,23 @@ detections raw_detect_to_count(detections &alice, detections &bob)
 		answer.key.push_back(alice.key[pos]);
 	}
 	return answer;
+}
+
+void brd_test(board_if::board_if &brd)
+{
+	using namespace std;
+	//Для начала попробуем записать TableRNG
+	{
+		vector<unsigned short int> table_rng(20);
+		for (unsigned int i = 0; i < table_rng.size(); i++) table_rng[i] = i; 
+		brd.TableRNG(table_rng);
+	}
+
+	//Теперь включим DMA и поглядим сколько буфером запишется
+	{
+		brd.StoreDMA(100);
+
+		int x;
+		x++;
+	}
 }
