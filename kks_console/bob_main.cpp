@@ -22,7 +22,9 @@ int main( void )
 	using namespace std;
 	try{
 		board_if::board_if brd;
-		NetWork::NetWork server(1, "50000");
+		int max_cli = 1;
+		char port[] = "50000";
+		NetWork::NetWork server(max_cli, port);
 		while (true)
 		{
 			regimes r = gen_key;
@@ -49,14 +51,14 @@ int main( void )
 
 //--------------------------------------------------
 //Определения функций Боба
-void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server)
+void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server) throw()
 {
 	using namespace std;
 	//Запишем таблицу случайных чисел
 	{
 		unsigned int t_size = AnBTableMaxSize;
 		vector<unsigned short int> tablerng(t_size); 
-		for (int i = 0; i < t_size; i++)
+		for (size_t i = 0; i < t_size; i++)
 			tablerng[i] = random();//Пофиг на %4 - всё равно это проверяется
 		brd.TableRNG(tablerng);
 	}
@@ -65,7 +67,7 @@ void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server)
 
 	//Отметим некоторые (10%) биты для измерения QBER
 	{
-		float qber_percentage;
+		float qber_percentage = 0.1;
 		bob_data.special.resize(bob_data.count.size(), false);
 		for (int i = 0; i < bob_data.count.size()*qber_percentage; i++)
 		bob_data.special[random()%bob_data.count.size()] = true;
@@ -77,13 +79,6 @@ void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server)
 
 	double qber;
 	vector<bool> my_key = sift_key(bob_data, alice_data, qber);
-	//Примем ответ Алисы
-	for (int i = 0; i < alice_data.key.size(); i++)
-		if (!bob_data.special[i]) alice_data.key[i] = 0;
-
-	alice_data.special = bob_data.special;
-
-	bob.Send(alice_data);
 
 	if (qber >= max_qber)
 	{
@@ -94,11 +89,10 @@ void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server)
 		return;
 	}
 	
-	//Принимаем код Хэмминга
+	//Отправим код Хэмминга
 	{
-		vector<bool> ham_code;
-		bob.Recv(ham_code);
-		//my_key = hamming_decode(my_key, ham_code);
+		//vector<bool> ham_code = hamming_coder(my_key);
+		//server.Send(ham_code, NetWork::peers::alice);
 	}
 	
 	//В данной точке my_key - это полностью готовый ключ

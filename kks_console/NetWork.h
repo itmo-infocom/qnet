@@ -93,6 +93,7 @@ namespace NetWork
 		
 		void PrivateSend( int p, void *&cmd, size_t size )
 		{
+			//TODO: Сделать так, чтобы при разрыве после восстановления соединения всё продолжналось с того же места
 			int fd;
 			if (p < peers_size) fd = clients[p];
 			while (true)
@@ -244,19 +245,20 @@ namespace NetWork
 		Recv(r, bytes, p);
 
 		unsigned char *package = (unsigned char*)r;
-		for (size_t i = 0; i < size; i++)
+		for (size_t i = 0; i < (size_t)size; i++)
 		v.push_back(package[i/8] & (0b1 << (i%8)));
 	};
 
-	void Send(vector<unsigned int> &v, peers p)
+	void NetWork::Send(vector<unsigned int> &v, peers p)
 	{
 		Send((int)v.size(), p);
 
 		if (v.size() == 0) return;
-
-		PrivateSend(p, (void*)v.front(), v.size()*sizeof(v.front()));
+		
+		void *ptr = &v[0];
+		PrivateSend(p, ptr, v.size()*sizeof(v.front()));
 	}
-	void Recv(vector<unsigned int> &v, peers p)
+	void NetWork::Recv(vector<unsigned int> &v, peers p)
 	{
 		int size;
 		Recv(size, p);
@@ -264,7 +266,8 @@ namespace NetWork
 		if (v.size() == 0) return;
 
 		v.resize(size);
-		PrivateRecv(p, (void*)v.front(), v.size()*sizeof(v.front()));
+		void *ptr = &v[0];
+		PrivateRecv(p, ptr, v.size()*sizeof(v.front()));
 	}
 
 	void NetWork::Send(detections &d, peers p)

@@ -112,7 +112,7 @@ using namespace std;
         //Инициализируем DMA
         top->DMAEnable();
         AnBRegInfo reg;
-        reg.value.raw = 1;
+        reg.value.dma.enabled = 1;
         reg.address = AnBRegs::RegDMA;
         detections answer;
         top->RegRawWrite(reg);//Стартовал DMA
@@ -122,7 +122,8 @@ using namespace std;
         {
             char *buf;
             top->DMARead(buf);
-            answer.append(DMAFrame::DMAFrame(buf).to_detections(type));
+            //TODO: Сделать так, чтобы не парсить все отсчёты, а брать из буфера только те, которые сработали на Бобе
+            answer.append(DMAFrame(buf).to_detections(type));
         }
         reg.value.raw = 0;
         top->RegRawWrite(reg);//Остановили DMA

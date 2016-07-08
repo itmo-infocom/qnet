@@ -26,7 +26,9 @@ int main( void )
 	using namespace std;
 	try{
 		board_if::board_if brd;
-		NetWork::NetWork bob("localhost4", "50000");
+		char hostname[] = "localhost4";
+		char port[] = "50000";
+		NetWork::NetWork bob(hostname, port);
 		while (true)
 		{
 			int regime;

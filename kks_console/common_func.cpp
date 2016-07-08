@@ -43,6 +43,8 @@ std::vector<bool> sift_key(const detections &my, const detections &other, double
 //Возвращает пырк
 std::vector<unsigned int> pyrk(std::size_t size)
 {
-	
+	using namespace std;
+	vector<unsigned int> answer;
+	return answer;
 }
 #endif // ! COMMON_CPP
