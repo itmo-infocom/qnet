@@ -1,5 +1,4 @@
 g++\
-    -g\
     -std=c++11\
     -pthread\
     -c\

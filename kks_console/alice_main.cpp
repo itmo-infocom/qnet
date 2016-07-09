@@ -6,18 +6,18 @@
 #include <vector>
 
 #include "board_if.h"
-#include "NetWork.h"
+//#include "NetWork.h"
 #include "detections.cpp"
 
-#include "common_func.cpp"
+//#include "common_func.cpp"
 
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 //Алгоритм генерации ключа
-void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw();
+//void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw();
 
 //Приводит сплошной массив Алисы к разреженному как у Боба
-detections raw_detect_to_count(detections &alice, detections &bob);
+//detections raw_detect_to_count(detections &alice, detections &bob);
 void brd_test(board_if::board_if &brd);
 
 //---------------------------------------
@@ -30,16 +30,16 @@ int main( void )
 		brd_test(brd);
 		char hostname[] = "localhost4";
 		char port[] = "50000";
-		NetWork::NetWork bob(hostname, port);
-		bob.Send(NetWork::peers::alice);
-		while (true)
+		//NetWork::NetWork bob(hostname, port);
+		//bob.Send(NetWork::peers::alice);
+		while (false)
 		{
 			int regime;
-			bob.Recv(regime);
+			//bob.Recv(regime);
 			switch (regime)
 			{
 				default:
-				gen_key_alg(brd, bob);
+				//gen_key_alg(brd, bob);
 				break;
 			}
 		}
@@ -49,13 +49,14 @@ int main( void )
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;
 	}
-	catch(NetWork::NetWork::except &obj)
+	/*catch(NetWork::NetWork::except &obj)
 	{
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;
-	}
+	}*/
 }
 
+/*
 void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw()
 {
 	using namespace std;
@@ -124,6 +125,7 @@ detections raw_detect_to_count(detections &alice, detections &bob)
 	}
 	return answer;
 }
+*/
 
 void brd_test(board_if::board_if &brd)
 {
@@ -135,9 +137,9 @@ void brd_test(board_if::board_if &brd)
 		brd.TableRNG(table_rng);
 	}
 
-	//Теперь включим DMA и поглядим сколько буфером запишется
+	//Теперь включим DMA и поглядим сколько буферов запишется
 	{
-		brd.StoreDMA(100);
+		brd.StoreDMA(10);
 
 		int x;
 		x++;

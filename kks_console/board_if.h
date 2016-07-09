@@ -13,13 +13,14 @@
 
 namespace board_if
 {
+
 using namespace AnB;
 using namespace std;
 
-    class board_if: protected AnBDriverAPI
+    class board_if
     {
         bool type;//Тип устройства
-        bool DMAStatus;
+        bool DMAStatus;//Текущий статус DMA
         device_list devices;//Список всех подключённых устройства
         AnBDriverAPI *top, *bottom;//Верхняя и нижняя платы
         enum reg_map
@@ -45,8 +46,9 @@ using namespace std;
             LVDS_CALIBR_REVERS = 0x80000000
         };
 
-        std::vector<DMAFrame> DMAFrames;
+        std::vector<DMAFrame> DMAFrames;//TODO: Переделать в структуру, которая хранит и сможет возвращать непрерывный поток бит или выдавать нужные биты по номеру или по поиску detections
     public:
+        //Структура для обработки исключений
         struct except{
             private:
             struct error errstruct;
@@ -75,12 +77,12 @@ using namespace std;
         void SetDMA(bool status);
 
         //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
-        void StoreDMA(double t);
+        void StoreDMA(size_t t);
     };
 
     board_if::board_if() throw(except)
     {
-        if (!GetDevicesList(devices))
+        if (!AnBDriverAPI::GetDevicesList(devices))
             throw except("GetDeviceList");
 
         //Определим какого типа плата у нас
@@ -101,16 +103,6 @@ using namespace std;
             //Если Алиса - то только одна плата
             top = devices.array[0].dev_ref;
             bottom = nullptr;
-        }
-
-        //Принудительно выключим DMA регистром ПЛИС
-        if (false)
-        {
-            reg.value.dma.enabled = 0;
-            reg.address = AnBRegs::RegDMA;
-            if (!top->RegRawWrite(reg)) throw except("RegRawWrite/top");
-            if (type) 
-                if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
         }
         DMAStatus = false;
     }
@@ -154,7 +146,7 @@ using namespace std;
         return answer;
     };
 
-    void board_if::TableRNG(std::vector<unsigned short int> t)
+    void board_if::TableRNG(std::vector<unsigned short int> t)//TODO: Переделать в простой int
     {
         using namespace std;
         size_t buf_size = t.size()/4 + (t.size()%4)?1:0;
@@ -187,15 +179,15 @@ using namespace std;
         if (status) top->DMAEnable();
         else top->DMADisable();
 
-        AnBRegInfo reg;
+        /*AnBRegInfo reg;
         reg.address = AnBRegs::RegDMA;
         reg.value.dma.enabled = status;
-        top->RegRawWrite(reg);
+        top->RegRawWrite(reg);*/
         
         DMAStatus = status;
     }
 
-    void board_if::StoreDMA(double t)
+    void board_if::StoreDMA(size_t t)
     {
         if (!DMAStatus) top->DMAEnable();
 
@@ -209,15 +201,14 @@ using namespace std;
         }
         
         clock_t start = clock();
-        vector<char*> buffers;
+        vector<char*> buffers(t);
 
-        while ((start-clock())/(CLOCKS_PER_SEC*1e-3) < t)
+        for (size_t i = 0; i < t; i++)
         {
-            buffers.push_back(nullptr);
             char *buf;
-            top->DMARead(buf);
-            buffers.push_back(buf);
-            cout << buffers.size() << endl;
+            //if (!top->DMAIsReady()) continue;
+            top->DMARead(buffers[i]);
+            cout << i << endl;
         }
 
         top->DMADisable();
