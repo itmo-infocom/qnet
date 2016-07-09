@@ -7,8 +7,8 @@
 #include <time.h>
 #include <iostream>
 
-#include "./driverAnB/src/lib/AnBDefs.h"
-#include "./driverAnB/src/lib/driver.h"
+#include "./driverAnB/devel/AnBDefs.h"
+#include "./driverAnB/devel/driver.h"
 #include "DMAFrame.h"
 
 namespace board_if
@@ -104,11 +104,14 @@ using namespace std;
         }
 
         //Принудительно выключим DMA регистром ПЛИС
-        reg.value.dma.enabled = 0;
-        reg.address = AnBRegs::RegDMA;
-        if (!top->RegRawWrite(reg)) throw except("RegRawWrite/top");
-        if (type) 
-            if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
+        if (false)
+        {
+            reg.value.dma.enabled = 0;
+            reg.address = AnBRegs::RegDMA;
+            if (!top->RegRawWrite(reg)) throw except("RegRawWrite/top");
+            if (type) 
+                if (!bottom->RegRawWrite(reg)) throw except("RegRawWrite/bottom");
+        }
         DMAStatus = false;
     }
 
@@ -141,7 +144,8 @@ using namespace std;
             //TODO: Сделать так, чтобы не парсить все отсчёты, а брать из буфера только те, которые сработали на Бобе
             answer.append(DMAFrame(buf).to_detections(type));
         }
-        reg.value.raw = 0;
+
+        reg.value.dma.enabled = 0;
         top->RegRawWrite(reg);//Остановили DMA
 
         if (type) 
@@ -156,11 +160,22 @@ using namespace std;
         size_t buf_size = t.size()/4 + (t.size()%4)?1:0;
         char *buf = new char[buf_size];
         for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
+
         for (size_t i = 0; i < t.size(); i++)
         buf[i/4] |= (t[i] >> i%4) & 0b11;
 
         top->WriteTable(buf, buf_size, DestTables::TableRNG);
         if (type) bottom->WriteTable(buf, buf_size, DestTables::TableRNG);
+
+        //Зафиксируем размер таблицы в регистрах ПЛИС
+        {  
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTable;
+            reg.value.table.mode = AnBTableModes::Mode6;
+            reg.value.table.size = t.size();
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+        }
 
         delete buf;
     }
@@ -182,18 +197,17 @@ using namespace std;
 
     void board_if::StoreDMA(double t)
     {
+        if (!DMAStatus) top->DMAEnable();
+
         //Дёрнем регистром DMA, чтобы ПЛИС начала вещание
+        if (false)
         {
             AnBRegInfo reg;
             reg.address = AnBRegs::RegDMA;
             reg.value.dma.enabled = 1;
-            top->RegRawWrite(reg);
-            reg.value.dma.enabled = 0;
-            top->RegRawWrite(reg);
+            top->RegRawWrite(reg);            
         }
         
-        if (!DMAStatus) top->DMAEnable();
-
         clock_t start = clock();
         vector<char*> buffers;
 
