@@ -6,6 +6,8 @@
 #include <string>
 #include <time.h>
 #include <iostream>
+#include <iomanip>
+#include <fstream>
 
 #include "./driverAnB/devel/AnBDefs.h"
 #include "./driverAnB/devel/driver.h"
@@ -77,7 +79,7 @@ using namespace std;
         void SetDMA(bool status);
 
         //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
-        void StoreDMA(size_t t);
+        void StoreDMA(double t);
     };
 
     board_if::board_if() throw(except)
@@ -163,7 +165,7 @@ using namespace std;
         {  
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTable;
-            reg.value.table.mode = AnBTableModes::Mode6;
+            reg.value.table.mode = 2;
             reg.value.table.size = t.size();
             top->RegRawWrite(reg);
             if (type) bottom->RegRawWrite(reg);
@@ -187,32 +189,74 @@ using namespace std;
         DMAStatus = status;
     }
 
-    void board_if::StoreDMA(size_t t)
+    void board_if::StoreDMA(double t)
     {
-        if (!DMAStatus) top->DMAEnable();
 
-        //Дёрнем регистром DMA, чтобы ПЛИС начала вещание
         if (false)
         {
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegDMA;
-            reg.value.dma.enabled = 1;
-            top->RegRawWrite(reg);            
-        }
-        
-        clock_t start = clock();
-        vector<char*> buffers(t);
+            SetDMA(true);
+            clock_t start = clock();
+            vector<char*> buffers;
+            size_t count = 0;
 
-        for (size_t i = 0; i < t; i++)
+            while((clock() - start)/(CLOCKS_PER_SEC*1e-3) < t)
+            {
+                char *buf;
+                top->DMARead(buf);
+                delete buf;
+                count++;
+                //cout << buffers.size() << endl;
+            }
+            cout << count << endl;
+
+            SetDMA(false);
+            for (auto i : buffers) delete i;
+        }
+
+        if (true)
         {
             char *buf;
-            //if (!top->DMAIsReady()) continue;
-            top->DMARead(buffers[i]);
-            cout << i << endl;
+            int dt = 100;
+            AnBRegInfo reg;
+            reg.value.table.size = 32;
+            reg.value.table.mode = 0;
+            reg.address = AnBRegs::RegTable;
+            top->RegRawWrite(reg);
+            
+            unsigned long int a = 0x123456789ABCDEF;
+            
+            top->WriteTable((char*)&a, 8, DestTables::TableRNG);
+            {
+                cout << top->GetDump(DumpSources::BAR1_RNG);
+            }
+            //usleep(dt);
+            SetDMA(true);
+            if (false)
+            {
+                reg.address = AnBRegs::RegDMA;
+                reg.value.dma.enabled = 0;
+                top->RegRawWrite(reg);
+                reg.value.dma.enabled = 1;
+                top->RegRawWrite(reg);
+                reg.value.dma.enabled = 0;
+                top->RegRawWrite(reg);
+            }
+            
+            //usleep(dt);
+            for (int i = 0; i < 32; i++) top->DMARead(buf);
+            top->DMARead(buf);
+            //usleep(dt);
+            SetDMA(false);
+            //usleep(dt);
+            DMAFrame f(buf);
+            //cout << setbase(16) << a << " -> ";
+            for (int i = 0; i < 8; i++)
+            cout << setbase(16) << f.raw_at(i) << "; ";
+            cout << endl;
         }
-
-        top->DMADisable();
     }
+
+
 };
 
 #endif // !BOARD_IF_CPP

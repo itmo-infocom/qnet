@@ -133,13 +133,12 @@ void brd_test(board_if::board_if &brd)
 	//Для начала попробуем записать TableRNG
 	{
 		vector<unsigned short int> table_rng(20);
-		for (unsigned int i = 0; i < table_rng.size(); i++) table_rng[i] = i; 
-		brd.TableRNG(table_rng);
+		for (unsigned int i = 0; i < table_rng.size(); i++) table_rng[i] = 0; 
+		//brd.TableRNG(table_rng);
 	}
 
-	//Теперь включим DMA и поглядим сколько буферов запишется
 	{
-		brd.StoreDMA(10);
+		brd.StoreDMA(1000);
 
 		int x;
 		x++;

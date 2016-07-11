@@ -11,20 +11,31 @@
 
 struct DMAFrame
 {
-	DMAFrame(char *buf) { memory = (DMAWord*)buf; };
-	~DMAFrame() {delete memory;};
+	DMAFrame(char *buf);
 	
   detections to_detections( bool bob );//Возвращает структуру detections, сформированную из DMAFrame 
 
-private:
-	DMAWord *memory;
-  int find_start_gen(void);//Ищет номер нулевого бита окна генерации
-  unsigned int find_detect( unsigned int pos );//Ищет номер детектированного бита, начиная с позиции pos
-	unsigned int ticks_left_to_end(std::vector<unsigned int> &v);	
+	unsigned int bs_at(size_t pos);//Возвращает базисное состояние на позиции pos
+
+	unsigned int raw_at(size_t pos);
+
   static const std::size_t TICS = 16384*8;//Число временных отсчётов
 	static const std::size_t WORDS = TICS/8; //Число DMAWord в одном фрейме
 	static const std::size_t size_bytes = WORDS*4; //Размер memory в байтах
+private:
+	std::vector<DMAWord> memory;
+  int find_start_gen(void);//Ищет номер нулевого бита окна генерации
+  unsigned int find_detect( unsigned int pos );//Ищет номер детектированного бита, начиная с позиции pos
+	unsigned int ticks_left_to_end(std::vector<unsigned int> &v);	
 };
+
+DMAFrame::DMAFrame(char *buf)
+{
+	//memory.reserve(WORDS);
+	for (size_t i = 0; i < WORDS; i++)
+	memory.push_back((unsigned int)*(buf + i*sizeof(unsigned int)));
+	delete buf;
+}
 
 int DMAFrame::find_start_gen(void)
 {
@@ -92,4 +103,14 @@ unsigned int DMAFrame::ticks_left_to_end(std::vector<unsigned int> &v)
 	for (auto i : v) answer -= i;
   return answer;
 };
+
+unsigned int DMAFrame::bs_at(size_t pos)
+{
+	return (memory[pos/8].bs(pos % 8));
+}
+
+uint32_t DMAFrame::raw_at(size_t pos)
+{
+	return memory[pos].raw;
+}
 #endif
