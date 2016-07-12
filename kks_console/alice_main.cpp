@@ -18,16 +18,16 @@ const std::string URL = "http://localhost4/qchannel/1/";
 
 //Приводит сплошной массив Алисы к разреженному как у Боба
 //detections raw_detect_to_count(detections &alice, detections &bob);
-void brd_test(board_if::board_if &brd);
+void brd_test(board_if::board_if &brd, int argc, char** argv);
 
 //---------------------------------------
 //Точка входа
-int main( void )
+int main( int argc, char** argv )
 {
 	using namespace std;
 	try{
 		board_if::board_if brd;
-		brd_test(brd);
+		brd_test(brd, argc, argv);
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		//NetWork::NetWork bob(hostname, port);
@@ -127,7 +127,7 @@ detections raw_detect_to_count(detections &alice, detections &bob)
 }
 */
 
-void brd_test(board_if::board_if &brd)
+void brd_test(board_if::board_if &brd, int argc, char** argv)
 {
 	using namespace std;
 	//Для начала попробуем записать TableRNG
@@ -138,7 +138,7 @@ void brd_test(board_if::board_if &brd)
 	}
 
 	{
-		brd.StoreDMA(1000);
+		brd.StoreDMA(1000, argc, argv);
 
 		int x;
 		x++;

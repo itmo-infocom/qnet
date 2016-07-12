@@ -79,7 +79,7 @@ using namespace std;
         void SetDMA(bool status);
 
         //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
-        void StoreDMA(double t);
+        void StoreDMA(double t, int argc, char** argv);
     };
 
     board_if::board_if() throw(except)
@@ -189,7 +189,7 @@ using namespace std;
         DMAStatus = status;
     }
 
-    void board_if::StoreDMA(double t)
+    void board_if::StoreDMA(double t, int argc, char** argv)
     {
 
         if (false)
@@ -218,20 +218,17 @@ using namespace std;
             char *buf;
             int dt = 100;
             AnBRegInfo reg;
-            reg.value.table.size = 32;
-            reg.value.table.mode = 0;
+            if (argc < 2) return;
+            reg.value.table.size = stoi(argv[1]);
+            reg.value.table.mode = stoi(argv[2]);
             reg.address = AnBRegs::RegTable;
             top->RegRawWrite(reg);
             
             unsigned long int a = 0x123456789ABCDEF;
             
             top->WriteTable((char*)&a, 8, DestTables::TableRNG);
-            {
-                cout << top->GetDump(DumpSources::BAR1_RNG);
-            }
             //usleep(dt);
-            SetDMA(true);
-            if (false)
+            if (true)
             {
                 reg.address = AnBRegs::RegDMA;
                 reg.value.dma.enabled = 0;
@@ -241,17 +238,36 @@ using namespace std;
                 reg.value.dma.enabled = 0;
                 top->RegRawWrite(reg);
             }
+            SetDMA(true);
             
             //usleep(dt);
-            for (int i = 0; i < 32; i++) top->DMARead(buf);
+            for (int i = 0; i < 32; i++) 
+            {
+                top->DMARead(buf);
+                delete buf;
+            }
             top->DMARead(buf);
             //usleep(dt);
             SetDMA(false);
             //usleep(dt);
-            DMAFrame f(buf);
+            unsigned int *p = (unsigned int*)buf;
+            //DMAFrame f(buf);
             //cout << setbase(16) << a << " -> ";
-            for (int i = 0; i < 8; i++)
-            cout << setbase(16) << f.raw_at(i) << "; ";
+            cout << "DMA:" << endl;
+            for (int i = 0; i < 64; i++)
+                //cout << setbase(16) << (p[i] & 0xFFFF) << "; ";
+            {
+                for (int j = 14; j >= 0; j-=2)
+                    cout << ((p[i] >> j) & 0b11);
+                cout << endl;
+            } 
+            cout << endl;
+            delete buf;
+
+            cout << "TableRNG:" << endl;
+            //cout << top->GetDump(DumpSources::BAR1_RNG);
+            for (int i = sizeof(a)*8/2 - 2; i >= 0 ; i-=2)
+                cout << ((a>>i) & 0b11);
             cout << endl;
         }
     }

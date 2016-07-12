@@ -32,8 +32,12 @@ private:
 DMAFrame::DMAFrame(char *buf)
 {
 	//memory.reserve(WORDS);
+	unsigned int *p = (unsigned int*)buf;
 	for (size_t i = 0; i < WORDS; i++)
-	memory.push_back((unsigned int)*(buf + i*sizeof(unsigned int)));
+	{
+		//DMAWord tmp(p[i]);
+		memory.push_back(DMAWord(p[i]));
+	}
 	delete buf;
 }
 
@@ -109,7 +113,7 @@ unsigned int DMAFrame::bs_at(size_t pos)
 	return (memory[pos/8].bs(pos % 8));
 }
 
-uint32_t DMAFrame::raw_at(size_t pos)
+unsigned int DMAFrame::raw_at(size_t pos)
 {
 	return memory[pos].raw;
 }
