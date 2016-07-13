@@ -2,21 +2,66 @@
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <semaphore.h>
 
-//#define BUF_SIZE 1024
-#define BUF_SIZE 100
+
+#define BUF_SIZE 1024
+#define BLOCK_SIZE BUF_SIZE/128
 
 struct key {
-  int num;
+  char num[8];
   char key[BUF_SIZE];
+  int curpos;
   size_t size;
   struct key *next;
 };
+char *myfifo = "/tmp/myfifo";
+int fd;
+char buf[1];
+pthread_t tid;
+pthread_mutex_t lock;
+int reread = 0;
+int toclose = 0;
+char *arg1;
+
+int checkfifo(){
+	return access(myfifo, F_OK)!=-1;
+}
+
+void* doWork(void *arg){
+	int size; 
+
+        while(checkfifo()){
+                size = read(fd, buf, 1);
+                if(size>0&&strncmp(buf,"\n",1)){
+                        if(!strncmp(buf,"r",1)){
+				fprintf(stderr, "REREAD KEYS\n");
+                                pthread_mutex_lock(&lock);
+                                reread = 1;
+                                pthread_mutex_unlock(&lock);
+                        }else{
+				if(!strncmp(buf,"q",1)){
+                                        pthread_mutex_lock(&lock);
+                                        toclose = 1;
+                                        pthread_mutex_unlock(&lock);
+                                        return NULL;
+                                }
+                        }
+                        fflush(stdout);
+                }
+         }
+}
+
+
 
 struct key *keys = NULL;
 
 char in[BUF_SIZE], out[BUF_SIZE];
-
 struct key *key_alloc(int num)
 {
   struct key *key, *k;
@@ -35,7 +80,7 @@ struct key *key_alloc(int num)
   } else keys = key;
 
   key->size = 0;
-  key->num = num;
+  memcpy(key->num,(void*)num,sizeof(int));
   // Circular list
   key->next = keys;
 
@@ -56,7 +101,7 @@ int get_key(char *file)
 
   key = key_alloc(0);
   if (key == NULL) return(0);
-
+  key->curpos = 0;
   while(fgets(in, BUF_SIZE, f) != NULL) {
     ret = sscanf(in, "%d       %d", &bit, &tmp);
     if (ret) {
@@ -74,12 +119,13 @@ int get_key(char *file)
 	// Next key
 	if (cnt > BUF_SIZE) {
 	  res += cnt;
-	  fprintf(stderr, "key.num=%d key.size=%d\n", key->num, key->size);
+	  fprintf(stderr, "key.num=%s key.size=%d\n", key->num, key->size);
 	  for(i=0; i < key->size; i++)
 	    fprintf(stderr, "key[%d]: 0%o\n", i, key->key[i]);
 
 	  key = key_alloc(++num);
 	  if (key == NULL) return(0);
+          key->curpos = 0;
 	  cnt = 0;
 	}
       }
@@ -90,79 +136,109 @@ int get_key(char *file)
   return(res);
 }
 
+
 void print_key(struct key * key)
 {
   int i;
 
-  fprintf(stderr, "key: %d %d\n", key->num, key->size);
+  fprintf(stderr, "%d ", key->size+8);
+  for(i=0; i<8; i++)
+    fprintf(stderr, "%x ", key->num[i]);
+  fprintf(stderr, "%d", key->curpos);
+  fprintf(stderr, "\n");
 }
 
-size_t crypt(struct key *key)
+size_t crypt_my(struct key *key)
 {
   size_t size;
   int i;
-
+  size_t readsize;
   fprintf(stderr, "crypt ");
 
   print_key(key);
+  while(!feof(stdin)){
+  pthread_mutex_lock(&lock);
+  if(toclose){
+	break;
+  }else{
+	if(reread){
+		reread = 0;
+		get_key(arg1);
+		key = keys;
+        }
+  }
+  pthread_mutex_unlock(&lock);
 
-  size = fread(in, 1, key->size, stdin);
+  size = fread(in, 1, BLOCK_SIZE, stdin);
+  readsize = size;
   fprintf(stderr, "size: %d\n", size);
   if (size == 0) return(0);
 
-  //fprintf(stderr, "size: %d in: '%s' \n", size, in);
+  fprintf(stderr, "size: %d in: '%s' \n", size, in);
+  
 
-  for(i=0; i < size; i++) {
-    out[i] = in[i] ^ key->key[i];
-    fprintf(stderr, "i=%d in: 0%o out: 0%o key: 0%o\n",
-	    i, in[i], out[i], key->key[i]);
+  for(i=0; i < size; i++){
+    out[i] = in[i] ^ key->key[i+key->curpos];
+    fprintf(stderr, "%x", out[i]);
   }
-  fwrite(&key->num, 1, sizeof(int), stdout);
-  fwrite(&key->size, 1, sizeof(size_t), stdout);
+  fwrite(key->num, 1, 8, stdout);
+  fwrite(&(key->curpos), sizeof(int),1, stdout);
+  key->curpos+=size;
+  if(key->curpos>=key->size){
+	key->curpos=0;
+        key = key->next;
+  }
   size = fwrite(out, 1, size, stdout);
   fflush(stdout);
-
-  fprintf(stderr, "num=%d size=%d\n", key->num, key->size);
-
+  if(readsize < BLOCK_SIZE)
+	if(feof(stdin))
+		break;
+  }
   return(size);
 }
 
 size_t decrypt()
 {
-  struct key *key = keys;
-  size_t num, size;
+  struct key *key;
+  size_t size;
   int i;
+  int flagToReload = 1;
 
   fprintf(stderr, "decrypt ");
-  if (! fread(&num, 1, sizeof(int), stdin)) return(0);
-  if (! fread(&size, 1, sizeof(size_t), stdin)) return(0);
-  fprintf(stderr, "num=%d key->num=%d (num - key->num)=%d\n", num, key->num, num - key->num);
-  fprintf(stderr, "num=%d size=%d\n", num, size);
+  size = fread(in, 1, 8, stdin);
+  fprintf(stderr, "size=%d\n", size);
+  if (size == 0) return(0);
 
-  do {
-    fprintf(stderr, "num=%d key->num=%d (num - key->num)=%d\n", num, key->num, num - key->num);
-    if(num == key->num) {
-      print_key(key);
-      size = fread(in, 1, key->size, stdin);
-      fprintf(stderr, "size=%d key->size=%d\n", size, key->size);
-      fflush(stdout);
+  for(i=0; i<8; i++)
+    fprintf(stderr, "%x", in[i]);
 
-      for(i=0; i < size; i++) {
-	out[i] = in[i] ^ key->key[i];
-	fprintf(stderr, "i=%d in: 0%o out: 0%o key: 0%o\n",
-		i, in[i], out[i], key->key[i]);
-      }
-      size = fwrite(out, 1, size, stdout);
-      fflush(stdout);
-      break;
-    }
-    key=key->next;
-  } while (key->next != keys);
+  while(flagToReload==1){
+  	for(key = keys; key->next != keys; key=key->next)
+    		if(strncmp(in, key->num, 8) == 0){
+			flagToReload = 0;
+			break;
+    		}
+  	if(flagToReload==1){
+		get_key(arg1);
+  	}
+  }
+  //current key position
+  fread(&(key->curpos), sizeof(int),1, stdin);
+  print_key(key);
+  size = fread(in, 1, size, stdin);
+  fprintf(stderr, "size=%d key->size=%d\n", size, key->size);
+  //if (size != key->size) return(0);
+
+  for(i=0; i < size; i++){
+    out[i] = in[i] ^ key->key[i+key->curpos];
+  }
+  size = fwrite(out, 1, size, stdout);
+  fflush(stdout);
 
   return(size);
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   char *fname;
   char *p;
@@ -176,11 +252,13 @@ main(int argc, char **argv)
 
   if(argc != 2)
     {
-      fprintf(stderr, "Usage: %s key_file\n", fname);
+      fprintf(stderr, "Usage: %s keys_file\n", fname);
       exit(-1);
     }
 
-  result = get_key(argv[1]);
+  arg1 = malloc(strlen(argv[1])+1);
+  strcpy(arg1, argv[1]);
+  result = get_key(arg1);
   if(result)
     fprintf(stderr, "%d bytes in key\n", result);
   else
@@ -191,10 +269,20 @@ main(int argc, char **argv)
 
   if(strncmp(fname, "qacrypt", strlen("qacrypt")) == 0)
     {
-      for(key = keys; ; key=key->next)
-	if (!crypt(key)) break;
+        while(!checkfifo()){
+                sleep(0.1);
+        }
+        fd = open(myfifo, O_RDONLY);
+	pthread_mutex_init(&lock, NULL);
+	pthread_create(&tid,NULL,&doWork, NULL);
+	key = keys;
+	crypt_my(key);
+	pthread_mutex_destroy(&lock);
+	close(fd);
     }
   else if(strncmp(fname, "qauncrypt", strlen("qauncrypt")) == 0)
     while(size)
       size = decrypt();
+  free(arg1);
 }
+

@@ -1,0 +1,14 @@
+Управление:
+./tfile
+
+Декодер:
+nc -l -p 4444 | /opt/qcrypt/sbin/qbuncrypt /opt/qcrypt/share/qbcrypt _Bob.key 2>>/var/log/quncrypt.log
+
+Кодер:
+nc -l -p 3333 | /opt/qcrypt/sbin/qbcrypt /opt/qcrypt/share/qbcrypt _Bob.key 2>>/var/log/qcrypt.log | nc 127.0.0.1 4444
+
+Передача данных:
+nc 127.0.0.1 3333 </opt/qcrypt/share/test/test3
+
+в терминале передачи данных можно вписывать текст, он будет выдаваться в терминале декодера. в терминале tfile можно псать команду r для повторного считывания ключей из папки. В тот момент, когда декодер не найдет в своем спске номер ключа, он считает ключи со своей папки.
+

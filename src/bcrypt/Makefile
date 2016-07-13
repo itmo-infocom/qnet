@@ -1,1 +1,2 @@
-CFLAGS=-g
+CFLAGS=-g 
+LDFLAGS=-pthread
