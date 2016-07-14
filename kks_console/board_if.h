@@ -11,8 +11,8 @@
 #include <errno.h>//Для использования errno
 #include <string.h>//Ради strerror
 
-#include "./driverAnB/devel/AnBDefs.h"
-#include "./driverAnB/devel/driver.h"
+#include "./driverAnB/src/lib/AnBDefs.h"
+#include "./driverAnB/src/lib/driver.h"
 #include "DMAFrame.h"
 
 namespace board_if
@@ -27,29 +27,7 @@ using namespace std;
         bool DMAStatus;//Текущий статус DMA
         device_list devices;//Список всех подключённых устройства
         AnBDriverAPI *top, *bottom;//Верхняя и нижняя платы
-        enum reg_map
-        {
-            // Board Mode Register
-            // bit0 - '0' => Alice, '1' => Bob
-            // bit[7:4] - Table Mode
-            // bit[23:8] - Table Size
-            // bit[25:24] - mem select '00' -> rnd, '01' -> DAC, '10' - DAC CALIB, '11' -> calib
-            //LVDS_PCI_REG_MODE 0x08,
-            
-            // STB delay Register
-            AB_STB_DELAY_REG = 0x20,
-            
-            // Start pattern Register
-            AB_PATTERN_REG = 0x28,
-            
-            LVDS_PCI_INT_DMA = 0x02,
-            LVDS_CALIBR_RDY = 0x04,
-            
-            AB_CALIBRMAX_REG = 0x50,
-            LVDS_CALIBR_MAX_MASK = 0xFF,
-            LVDS_CALIBR_REVERS = 0x80000000
-        };
-
+       
         std::vector<DMAFrame> DMAFrames;//TODO: Переделать в структуру, которая хранит и сможет возвращать непрерывный поток бит или выдавать нужные биты по номеру или по поиску detections
     public:
         //Структура для обработки исключений
@@ -108,6 +86,13 @@ using namespace std;
             top = devices.array[0].dev_ref;
             bottom = nullptr;
         }
+
+        //Выставим strobe-delay на ноль
+        /*{
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegSTB;
+            //reg.value.raw = 
+        }*/
         DMAStatus = false;
     }
 
@@ -220,7 +205,7 @@ using namespace std;
             if (argc < 2) return;
             AnBRegInfo reg;
             //reg.value.table.size = stoi(argv[1]);
-            reg.value.table.size = 4096;
+            reg.value.table.size = stoi(argv[1]);
             reg.value.table.mode = stoi(argv[2]);
             reg.address = AnBRegs::RegTable;
             top->RegRawWrite(reg);
