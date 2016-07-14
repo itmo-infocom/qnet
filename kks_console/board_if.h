@@ -8,6 +8,8 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <errno.h>//Для использования errno
+#include <string.h>//Ради strerror
 
 #include "./driverAnB/devel/AnBDefs.h"
 #include "./driverAnB/devel/driver.h"
@@ -151,12 +153,12 @@ using namespace std;
     void board_if::TableRNG(std::vector<unsigned short int> t)//TODO: Переделать в простой int
     {
         using namespace std;
-        size_t buf_size = t.size()/4 + (t.size()%4)?1:0;
+        size_t buf_size = t.size()/4 + ((t.size()%4)?1:0);
         char *buf = new char[buf_size];
         for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
 
         for (size_t i = 0; i < t.size(); i++)
-        buf[i/4] |= (t[i] >> i%4) & 0b11;
+            buf[i/4] += (t[i] >> (i % 4)) & 0b11;
 
         top->WriteTable(buf, buf_size, DestTables::TableRNG);
         if (type) bottom->WriteTable(buf, buf_size, DestTables::TableRNG);
@@ -165,7 +167,7 @@ using namespace std;
         {  
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTable;
-            reg.value.table.mode = 2;
+            top->RegRawRead(reg);
             reg.value.table.size = t.size();
             top->RegRawWrite(reg);
             if (type) bottom->RegRawWrite(reg);
@@ -215,60 +217,133 @@ using namespace std;
 
         if (true)
         {
-            char *buf;
-            int dt = 100;
-            AnBRegInfo reg;
             if (argc < 2) return;
-            reg.value.table.size = stoi(argv[1]);
+            AnBRegInfo reg;
+            //reg.value.table.size = stoi(argv[1]);
+            reg.value.table.size = 4096;
             reg.value.table.mode = stoi(argv[2]);
             reg.address = AnBRegs::RegTable;
             top->RegRawWrite(reg);
             
-            unsigned long int a = 0x123456789ABCDEF;
+            unsigned long int a = 0xFEDCBA9876543210;
             
-            top->WriteTable((char*)&a, 8, DestTables::TableRNG);
-            //usleep(dt);
+            if (false && !top->WriteTable((char*)&a, 8, DestTables::TableRNG))
+                {cerr << "Cannot write TableRNG" << endl; return;};
+            
+            if (false)
+            {
+                vector<unsigned short> tmp;
+                size_t s = stoi(argv[1]);
+                for (unsigned short i = 0; i < s; i++) tmp[i] = (i % 4);
+                TableRNG(tmp);
+            }
             if (true)
             {
-                reg.address = AnBRegs::RegDMA;
-                reg.value.dma.enabled = 0;
+                size_t s = stoi(argv[1]);
+                char *buf = new char[s/4];
+                for (int i = 0; i < s/4; i++) buf[i] = 0;
+                for (int i = 0; i < s; i++)
+                {
+                    int v = random() % 4;
+                    buf[i/4] += ((v & 0b11) << ((i % 4)*2));
+                    if (i % 4 == 0) cout << ' ';
+                    cout << (v & 0b11);
+                }
+                cout << endl;
+                top->WriteTable(buf, s/4, DestTables::TableRNG);
+                reg.address = AnBRegs::RegTable;
+                reg.value.table.size = s;
                 top->RegRawWrite(reg);
+                delete buf;
+            };
+
+            if (false)
+            {
+                char *table;
+                unsigned int size_table;
+                if (!top->ReadTable(table, size_table, DestTables::TableRNG))
+                {
+                    cerr << "Cannot read TableRNG" << endl;
+                    cerr << top->LastError() << endl;
+                    return;
+                };
+                for (int i = 0; i < 16; i++)
+                    for (int j = 0; j < 4; j++)
+                        cout << ((table[i] >> (2*j)) & 0b11);
+                cout << endl;
+                delete table;
+            }
+
+            if (false)
+            {
+                reg.address = AnBRegs::RegDMA;
                 reg.value.dma.enabled = 1;
                 top->RegRawWrite(reg);
                 reg.value.dma.enabled = 0;
                 top->RegRawWrite(reg);
+                reg.value.dma.enabled = 1;
+                top->RegRawWrite(reg);
             }
+            top->SetBuffersCount(1);
+            int buf_count = 16;
+            char *buf[buf_count];
             SetDMA(true);
-            
-            //usleep(dt);
-            for (int i = 0; i < 32; i++) 
+            if (true)
+            for (int i = 0; i < buf_count; i++) 
             {
-                top->DMARead(buf);
-                delete buf;
+                reg.address = AnBRegs::RegDMA;
+                reg.value.dma.enabled = 1;
+                top->RegRawWrite(reg);
+                top->DMARead(buf[i]);
+                {
+                    size_t s = stoi(argv[1]);
+                    char *buf = new char[s/4];
+                    for (int i = 0; i < s/4; i++) buf[i] = 0;
+                    for (int i = 0; i < s; i++)
+                    {
+                        int v = random() % 4;
+                        buf[i/4] += ((v & 0b11) << ((i % 4)*2));
+                        if (i % 4 == 0) cout << ' ';
+                        cout << (v & 0b11);
+                    }
+                    cout << endl;
+                    top->WriteTable(buf, s/4, DestTables::TableRNG);
+                    reg.address = AnBRegs::RegTable;
+                    reg.value.table.size = s;
+                    top->RegRawWrite(reg);
+                    delete buf;
+                };
+                reg.address = AnBRegs::RegDMA;
+                reg.value.dma.enabled = 0;
+                top->RegRawWrite(reg);
             }
-            top->DMARead(buf);
-            //usleep(dt);
             SetDMA(false);
-            //usleep(dt);
-            unsigned int *p = (unsigned int*)buf;
-            //DMAFrame f(buf);
-            //cout << setbase(16) << a << " -> ";
-            cout << "DMA:" << endl;
-            for (int i = 0; i < 64; i++)
-                //cout << setbase(16) << (p[i] & 0xFFFF) << "; ";
+            for (int i = 0; i < buf_count; i++)
             {
-                for (int j = 14; j >= 0; j-=2)
-                    cout << ((p[i] >> j) & 0b11);
-                cout << endl;
-            } 
-            cout << endl;
-            delete buf;
+                unsigned int *p = (unsigned int*)buf[i];
+                //cout << setbase(16) << a << " -> ";
+                //cout << "DMA:" << endl;
+                for (int i = 0; i < 1; i++)
+                    //cout << setbase(16) << (p[i]) << "; ";
+                if (true)
+                {
+                    for (int j = 0; j < 16; j+=2)
+                        cout << ((p[i] >> j) & 0b11);
+                    cout << endl;
+                } 
+                //cout << endl;
+            }
+            for (auto i : buf) delete i;
 
-            cout << "TableRNG:" << endl;
-            //cout << top->GetDump(DumpSources::BAR1_RNG);
-            for (int i = sizeof(a)*8/2 - 2; i >= 0 ; i-=2)
-                cout << ((a>>i) & 0b11);
-            cout << endl;
+            if (false)
+            {
+                cout << "TableRNG:" << endl;
+                cout << top->GetDump(DumpSources::BAR1_RNG);
+                if (false)
+                for (int i = sizeof(a)*8/2 - 2; i >= 0 ; i-=2)
+                    cout << ((a>>i) & 0b11);
+                cout << endl;
+            }
         }
     }
 
