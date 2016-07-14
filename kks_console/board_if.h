@@ -285,16 +285,58 @@ using namespace std;
                 top->RegRawWrite(reg);
             }
             top->SetBuffersCount(1);
-            int buf_count = 16;
+            int buf_count = 32;
             char *buf[buf_count];
-            SetDMA(true);
-            if (true)
-            for (int i = 0; i < buf_count; i++) 
+            for (int j = 0; j < 10; j++)
             {
-                reg.address = AnBRegs::RegDMA;
-                reg.value.dma.enabled = 1;
-                top->RegRawWrite(reg);
-                top->DMARead(buf[i]);
+                SetDMA(true);
+                unsigned short int prev = UINT16_MAX;
+                if (true)
+                for (int i = 0; i < buf_count; i++) 
+                {
+                    top->DMARead(buf[i]);
+                    if (((unsigned short int*)buf[i])[0] != prev && i != 0) cout << i << endl;
+                    if (false)
+                    {
+                        size_t s = stoi(argv[1]);
+                        char *buf_loc = new char[s/4];
+                        for (int i = 0; i < s/4; i++) buf_loc[i] = 0;
+                        for (int i = 0; i < s; i++)
+                        {
+                            int v = random() % 4;
+                            buf_loc[i/4] += ((v & 0b11) << ((i % 4)*2));
+                            if (i % 4 == 0) cout << ' ';
+                            cout << (v & 0b11);
+                        }
+                        cout << endl;
+                        SetDMA(false);
+                        usleep(50000);
+                        top->WriteTable(buf_loc, s/4, DestTables::TableRNG);
+                        usleep(50000);
+                        SetDMA(true);
+                        delete buf_loc;
+                    };
+                    prev = ((unsigned short int*)buf[i])[0];
+                }
+                SetDMA(false);
+                if (true)
+                for (int i = 0; i < 2; i++)
+                {
+                    unsigned int *p = (unsigned int*)buf[i];
+                    //cout << setbase(16) << a << " -> ";
+                    //cout << "DMA:" << endl;
+                    for (int i = 0; i < 1; i++)
+                        //cout << setbase(16) << (p[i]) << "; ";
+                    if (true)
+                    {
+                        for (int j = 0; j < 16; j+=2)
+                            cout << ((p[i] >> j) & 0b11);
+                        cout << endl;
+                    } 
+                    //cout << endl;
+                }
+                for (auto i : buf) delete i;
+                if (true)
                 {
                     size_t s = stoi(argv[1]);
                     char *buf = new char[s/4];
@@ -312,28 +354,16 @@ using namespace std;
                     reg.value.table.size = s;
                     top->RegRawWrite(reg);
                     delete buf;
+                    reg.address = AnBRegs::RegDMA;
+                    reg.value.dma.enabled = 1;
+                    top->RegRawWrite(reg);
+                    reg.value.dma.enabled = 0;
+                    top->RegRawWrite(reg);
+                    reg.value.dma.enabled = 1;
+                    top->RegRawWrite(reg);
                 };
-                reg.address = AnBRegs::RegDMA;
-                reg.value.dma.enabled = 0;
-                top->RegRawWrite(reg);
+                usleep(50000);
             }
-            SetDMA(false);
-            for (int i = 0; i < buf_count; i++)
-            {
-                unsigned int *p = (unsigned int*)buf[i];
-                //cout << setbase(16) << a << " -> ";
-                //cout << "DMA:" << endl;
-                for (int i = 0; i < 1; i++)
-                    //cout << setbase(16) << (p[i]) << "; ";
-                if (true)
-                {
-                    for (int j = 0; j < 16; j+=2)
-                        cout << ((p[i] >> j) & 0b11);
-                    cout << endl;
-                } 
-                //cout << endl;
-            }
-            for (auto i : buf) delete i;
 
             if (false)
             {
