@@ -13,6 +13,7 @@
 
 #include "./driverAnB/src/lib/AnBDefs.h"
 #include "./driverAnB/src/lib/driver.h"
+#include "./driverAnB/src/lib/driver.cpp"
 #include "DMAFrame.h"
 
 namespace board_if
@@ -68,12 +69,14 @@ using namespace std;
             throw except("GetDeviceList");
 
         //Определим какого типа плата у нас
-        AnBRegInfo reg;
-        reg.address = AnBRegs::RegMode;
-        if (!devices.array[0].dev_ref->RegRawRead(reg))
-        throw except("RegRawRead");
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegMode;
+            if (!devices.array[0].dev_ref->RegRawRead(reg))
+            throw except("RegRawRead");
+            type = reg.value.mode.mode;
+        }
 
-        type = reg.value.mode.mode;
         if (type)
         {
             //Если Боб - то можно работать с двумя платами
@@ -88,16 +91,70 @@ using namespace std;
         }
 
         //Выставим strobe-delay на ноль
-        /*{
+        {
             AnBRegInfo reg;
             reg.address = AnBRegs::RegSTB;
-            //reg.value.raw = 
-        }*/
+            reg.value.raw = 0;
+            top->RegRawWrite(reg); 
+        }
+
+        //Установим в качестве источника ГСЧ TableRNG
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawRead(reg);
+            reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
+            reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
+
+            reg.value.raw |= 0b1 << 7;//Принимаем детектирования с настоящего детектора
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+        }
+
+        //Сгенерируем stop-condition для профилактики
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+            reg.value.raw &= ~0b01;//Опускаем start-бит, чтобы не принимал данные
+
+            reg.value.raw |= 0b10;//Поднимает stop-бит
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+
+            reg.value.raw &= ~0b10;//Опускаем стоп-бит
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);        
+        }
+
+        //Установим dma enable в ноль
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegDMA;
+            reg.value.dma.enabled = 0;
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+        }
         DMAStatus = false;
     }
 
     board_if::~board_if()
     {
+        //Если Алиса - генерим stop condition
+        if (!type) 
+        {
+            //Если Алиса
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawRead(reg);
+            reg.value.raw &= ~0b01;//опускаем start-condition регистр на всякий случай
+            reg.value.raw |= 0b10;//Поднимает регистр stop-condition
+            top->RegRawWrite(reg);
+            reg.value.raw &= ~0b10;//Опускаем регистр stop-condtition
+            top->RegRawWrite(reg);
+        }
+
         if (DMAStatus)
         {
             top->DMADisable();
@@ -168,60 +225,84 @@ using namespace std;
         if (status) top->DMAEnable();
         else top->DMADisable();
 
-        /*AnBRegInfo reg;
-        reg.address = AnBRegs::RegDMA;
-        reg.value.dma.enabled = status;
-        top->RegRawWrite(reg);*/
-        
+        //Дёрнем start/stop condition 
+        if (!type) 
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawRead(reg);
+            if (status)
+            {
+                //Включение
+                reg.value.raw |= 0b01;//Поднимем start-бит
+                reg.value.raw &= ~0b10;//Опустим stop-бит
+                top->RegRawWrite(reg);
+            } else
+            {
+                //Выключение
+                reg.value.raw &= ~0b01;//Опускаем start-бит
+                reg.value.raw |= 0b10;//Поднимаем stop-бит
+                top->RegRawWrite(reg);
+                reg.value.raw &= ~0b10;//Опустим stop-бит
+                top->RegRawWrite(reg);
+            }
+        }
+
+        //Дёрнем или опустим регистр dma.enabled
+        if (status)
+        {
+            //Дёрнем
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegDMA;
+            reg.value.dma.enabled = 0;
+            top->RegRawWrite(reg);
+            reg.value.dma.enabled = 1;
+            top->RegRawWrite(reg);
+            reg.value.dma.enabled = 0;
+            top->RegRawWrite(reg);
+        }
+        else 
+        {
+            //Опустим
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegDMA;
+            reg.value.dma.enabled = 0;
+            top->RegRawWrite(reg);
+        }
+
+        //Очистим буфер DMA в случае выключения
+        if (!status)
+        {
+            char *buf;
+            time_t finish = clock() + 100e-3*CLOCKS_PER_SEC;//Будем очищать всё, что приходит в буфер в течение 100 мс
+            while (clock() < finish)
+            if (top->DMAIsReady())
+            {
+                top->DMARead(buf);
+                delete buf;
+            }
+        }
+
         DMAStatus = status;
     }
 
     void board_if::StoreDMA(double t, int argc, char** argv)
     {
 
-        if (false)
-        {
-            SetDMA(true);
-            clock_t start = clock();
-            vector<char*> buffers;
-            size_t count = 0;
-
-            while((clock() - start)/(CLOCKS_PER_SEC*1e-3) < t)
-            {
-                char *buf;
-                top->DMARead(buf);
-                delete buf;
-                count++;
-                //cout << buffers.size() << endl;
-            }
-            cout << count << endl;
-
-            SetDMA(false);
-            for (auto i : buffers) delete i;
-        }
-
         if (true)
         {
             if (argc < 2) return;
-            AnBRegInfo reg;
-            //reg.value.table.size = stoi(argv[1]);
-            reg.value.table.size = stoi(argv[1]);
-            reg.value.table.mode = stoi(argv[2]);
-            reg.address = AnBRegs::RegTable;
-            top->RegRawWrite(reg);
-            
-            unsigned long int a = 0xFEDCBA9876543210;
-            
-            if (false && !top->WriteTable((char*)&a, 8, DestTables::TableRNG))
-                {cerr << "Cannot write TableRNG" << endl; return;};
-            
-            if (false)
+
+            //Установка размера и режима работы таблицы
             {
-                vector<unsigned short> tmp;
-                size_t s = stoi(argv[1]);
-                for (unsigned short i = 0; i < s; i++) tmp[i] = (i % 4);
-                TableRNG(tmp);
+                AnBRegInfo reg;
+                reg.address = AnBRegs::RegTable;
+                reg.value.table.size = stoi(argv[1]);
+                reg.value.table.mode = stoi(argv[2]);
+                top->RegRawWrite(reg);
             }
+            
+            //Заполнение TableRNG случайными числами
             if (true)
             {
                 size_t s = stoi(argv[1]);
@@ -236,12 +317,14 @@ using namespace std;
                 }
                 cout << endl;
                 top->WriteTable(buf, s/4, DestTables::TableRNG);
+                AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
                 reg.value.table.size = s;
                 top->RegRawWrite(reg);
                 delete buf;
             };
 
+            //Чтение TableRNG
             if (false)
             {
                 char *table;
@@ -259,110 +342,61 @@ using namespace std;
                 delete table;
             }
 
-            if (false)
-            {
-                reg.address = AnBRegs::RegDMA;
-                reg.value.dma.enabled = 1;
-                top->RegRawWrite(reg);
-                reg.value.dma.enabled = 0;
-                top->RegRawWrite(reg);
-                reg.value.dma.enabled = 1;
-                top->RegRawWrite(reg);
-            }
-            top->SetBuffersCount(1);
+            top->SetBuffersCount(16);
             int buf_count = 32;
             char *buf[buf_count];
-            for (int j = 0; j < 10; j++)
+
+            SetDMA(true);
+            unsigned short int prev = UINT16_MAX;
+            if (true)
+            for (int i = 0; i < buf_count; i++) 
             {
-                SetDMA(true);
-                unsigned short int prev = UINT16_MAX;
-                if (true)
-                for (int i = 0; i < buf_count; i++) 
-                {
-                    top->DMARead(buf[i]);
-                    if (((unsigned short int*)buf[i])[0] != prev && i != 0) cout << i << endl;
-                    if (false)
-                    {
-                        size_t s = stoi(argv[1]);
-                        char *buf_loc = new char[s/4];
-                        for (int i = 0; i < s/4; i++) buf_loc[i] = 0;
-                        for (int i = 0; i < s; i++)
-                        {
-                            int v = random() % 4;
-                            buf_loc[i/4] += ((v & 0b11) << ((i % 4)*2));
-                            if (i % 4 == 0) cout << ' ';
-                            cout << (v & 0b11);
-                        }
-                        cout << endl;
-                        SetDMA(false);
-                        usleep(50000);
-                        top->WriteTable(buf_loc, s/4, DestTables::TableRNG);
-                        usleep(50000);
-                        SetDMA(true);
-                        delete buf_loc;
-                    };
-                    prev = ((unsigned short int*)buf[i])[0];
-                }
-                SetDMA(false);
-                if (true)
-                for (int i = 0; i < 2; i++)
-                {
-                    unsigned int *p = (unsigned int*)buf[i];
-                    //cout << setbase(16) << a << " -> ";
-                    //cout << "DMA:" << endl;
-                    for (int i = 0; i < 1; i++)
-                        //cout << setbase(16) << (p[i]) << "; ";
-                    if (true)
-                    {
-                        for (int j = 0; j < 16; j+=2)
-                            cout << ((p[i] >> j) & 0b11);
-                        cout << endl;
-                    } 
-                    //cout << endl;
-                }
-                for (auto i : buf) delete i;
-                if (true)
+                top->DMARead(buf[i]);
+                if (((unsigned short int*)buf[i])[0] != prev && i != 0) cout << i << endl;
+                if (false)
                 {
                     size_t s = stoi(argv[1]);
-                    char *buf = new char[s/4];
-                    for (int i = 0; i < s/4; i++) buf[i] = 0;
+                    char *buf_loc = new char[s/4];
+                    for (int i = 0; i < s/4; i++) buf_loc[i] = 0;
                     for (int i = 0; i < s; i++)
                     {
                         int v = random() % 4;
-                        buf[i/4] += ((v & 0b11) << ((i % 4)*2));
+                        buf_loc[i/4] += ((v & 0b11) << ((i % 4)*2));
                         if (i % 4 == 0) cout << ' ';
                         cout << (v & 0b11);
                     }
                     cout << endl;
-                    top->WriteTable(buf, s/4, DestTables::TableRNG);
-                    reg.address = AnBRegs::RegTable;
-                    reg.value.table.size = s;
-                    top->RegRawWrite(reg);
-                    delete buf;
-                    reg.address = AnBRegs::RegDMA;
-                    reg.value.dma.enabled = 1;
-                    top->RegRawWrite(reg);
-                    reg.value.dma.enabled = 0;
-                    top->RegRawWrite(reg);
-                    reg.value.dma.enabled = 1;
-                    top->RegRawWrite(reg);
+                    SetDMA(false);
+                    usleep(50000);
+                    top->WriteTable(buf_loc, s/4, DestTables::TableRNG);
+                    usleep(50000);
+                    SetDMA(true);
+                    delete buf_loc;
                 };
-                usleep(50000);
+                prev = ((unsigned short int*)buf[i])[0];
             }
+            SetDMA(false);
 
-            if (false)
+            //Вывод на экран первых слов каждого считанного фрейма
+            if (true)
+            for (int i = 0; i < buf_count; i++)
             {
-                cout << "TableRNG:" << endl;
-                cout << top->GetDump(DumpSources::BAR1_RNG);
-                if (false)
-                for (int i = sizeof(a)*8/2 - 2; i >= 0 ; i-=2)
-                    cout << ((a>>i) & 0b11);
-                cout << endl;
+                unsigned int *p = (unsigned int*)buf[i];
+                //cout << setbase(16) << a << " -> ";
+                //cout << "DMA:" << endl;
+                for (int i = 0; i < 1; i++)
+                    //cout << setbase(16) << (p[i]) << "; ";
+                if (true)
+                {
+                    for (int j = 0; j < 16; j+=2)
+                        cout << ((p[i] >> j) & 0b11);
+                    cout << endl;
+                } 
+                //cout << endl;
             }
+            for (auto i : buf) delete i;
         }
     }
-
-
 };
 
 #endif // !BOARD_IF_CPP
