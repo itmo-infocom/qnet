@@ -105,27 +105,10 @@ using namespace std;
             top->RegRawRead(reg);
             reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
             reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
-
-            reg.value.raw |= 0b1 << 7;//Принимаем детектирования с настоящего детектора
+            
+            reg.value.raw &= ~(0b1 << 7);//Принимаем детектирования с настоящего детектора
             top->RegRawWrite(reg);
             if (type) bottom->RegRawWrite(reg);
-        }
-
-        //Сгенерируем stop-condition для профилактики
-        {
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegTest;
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
-            reg.value.raw &= ~0b01;//Опускаем start-бит, чтобы не принимал данные
-
-            reg.value.raw |= 0b10;//Поднимает stop-бит
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
-
-            reg.value.raw &= ~0b10;//Опускаем стоп-бит
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);        
         }
 
         //Установим dma enable в ноль
@@ -293,11 +276,11 @@ using namespace std;
         {
             if (argc < 2) return;
 
-            //Установка размера и режима работы таблицы
+            //Установка режима работы таблицы
             {
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
-                reg.value.table.size = stoi(argv[1]);
+                top->RegRawRead(reg);
                 reg.value.table.mode = stoi(argv[2]);
                 top->RegRawWrite(reg);
             }
@@ -319,6 +302,7 @@ using namespace std;
                 top->WriteTable(buf, s/4, DestTables::TableRNG);
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
+                top->RegRawRead(reg);
                 reg.value.table.size = s;
                 top->RegRawWrite(reg);
                 delete buf;
@@ -348,7 +332,6 @@ using namespace std;
 
             SetDMA(true);
             unsigned short int prev = UINT16_MAX;
-            if (true)
             for (int i = 0; i < buf_count; i++) 
             {
                 top->DMARead(buf[i]);
