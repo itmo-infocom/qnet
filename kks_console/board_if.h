@@ -204,16 +204,20 @@ using namespace std;
     void board_if::SetDMA(bool status)
     {
         if (status == DMAStatus) return; 
+        DMAStatus = status;
 
+        cout << "Вкл/выкл DMA" << endl;
         if (status) top->DMAEnable();
         else top->DMADisable();
 
+        cout << "Start/stop" << endl;
         //Дёрнем start/stop condition 
         if (!type) 
         {
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
             top->RegRawRead(reg);
+           
             if (status)
             {
                 //Включение
@@ -231,28 +235,9 @@ using namespace std;
             }
         }
 
-        //Дёрнем или опустим регистр dma.enabled
-        if (status)
-        {
-            //Дёрнем
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegDMA;
-            reg.value.dma.enabled = 0;
-            top->RegRawWrite(reg);
-            reg.value.dma.enabled = 1;
-            top->RegRawWrite(reg);
-            reg.value.dma.enabled = 0;
-            top->RegRawWrite(reg);
-        }
-        else 
-        {
-            //Опустим
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegDMA;
-            reg.value.dma.enabled = 0;
-            top->RegRawWrite(reg);
-        }
+        //Дёрнем регистр dma.enabled не надо, т.к. это делается в модуле ядра
 
+        cout << "Clear DMA" << endl;
         //Очистим буфер DMA в случае выключения
         if (!status)
         {
@@ -265,8 +250,6 @@ using namespace std;
                 delete buf;
             }
         }
-
-        DMAStatus = status;
     }
 
     void board_if::StoreDMA(double t, int argc, char** argv)
@@ -295,11 +278,12 @@ using namespace std;
                 {
                     int v = random() % 4;
                     buf[i/4] += ((v & 0b11) << ((i % 4)*2));
-                    if (i % 4 == 0) cout << ' ';
-                    cout << (v & 0b11);
+                    //if (i % 4 == 0) cout << ' ';
+                    //cout << (v & 0b11);
                 }
-                cout << endl;
+                //cout << endl;
                 top->WriteTable(buf, s/4, DestTables::TableRNG);
+                
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
                 top->RegRawRead(reg);
@@ -308,76 +292,34 @@ using namespace std;
                 delete buf;
             };
 
-            //Чтение TableRNG
-            if (false)
-            {
-                char *table;
-                unsigned int size_table;
-                if (!top->ReadTable(table, size_table, DestTables::TableRNG))
-                {
-                    cerr << "Cannot read TableRNG" << endl;
-                    cerr << top->LastError() << endl;
-                    return;
-                };
-                for (int i = 0; i < 16; i++)
-                    for (int j = 0; j < 4; j++)
-                        cout << ((table[i] >> (2*j)) & 0b11);
-                cout << endl;
-                delete table;
-            }
-
             top->SetBuffersCount(16);
-            int buf_count = 32;
-            char *buf[buf_count];
-
+            
             SetDMA(true);
-            unsigned short int prev = UINT16_MAX;
-            for (int i = 0; i < buf_count; i++) 
+            unsigned int seconds = 0;//Число секунд с момента старта
+            unsigned int readed = 0;//Число прочитанных фреймов
+            while (seconds < 30) 
             {
-                top->DMARead(buf[i]);
-                if (((unsigned short int*)buf[i])[0] != prev && i != 0) cout << i << endl;
-                if (false)
+                
+                if (top->DMAIsReady())
                 {
-                    size_t s = stoi(argv[1]);
-                    char *buf_loc = new char[s/4];
-                    for (int i = 0; i < s/4; i++) buf_loc[i] = 0;
-                    for (int i = 0; i < s; i++)
-                    {
-                        int v = random() % 4;
-                        buf_loc[i/4] += ((v & 0b11) << ((i % 4)*2));
-                        if (i % 4 == 0) cout << ' ';
-                        cout << (v & 0b11);
-                    }
-                    cout << endl;
-                    SetDMA(false);
-                    usleep(50000);
-                    top->WriteTable(buf_loc, s/4, DestTables::TableRNG);
-                    usleep(50000);
-                    SetDMA(true);
-                    delete buf_loc;
-                };
-                prev = ((unsigned short int*)buf[i])[0];
-            }
-            SetDMA(false);
+                    char *buf = nullptr;
+                    top->DMARead(buf);
+                    //if (buf != nullptr) delete buf;
+                    
+                    readed++;
+                }
+                
+                if (readed == 16) SetDMA(false);
 
-            //Вывод на экран первых слов каждого считанного фрейма
-            if (true)
-            for (int i = 0; i < buf_count; i++)
-            {
-                unsigned int *p = (unsigned int*)buf[i];
-                //cout << setbase(16) << a << " -> ";
-                //cout << "DMA:" << endl;
-                for (int i = 0; i < 1; i++)
-                    //cout << setbase(16) << (p[i]) << "; ";
-                if (true)
+                if (clock() >= seconds*CLOCKS_PER_SEC)
                 {
-                    for (int j = 0; j < 16; j+=2)
-                        cout << ((p[i] >> j) & 0b11);
-                    cout << endl;
-                } 
-                //cout << endl;
+                    cout << readed << endl;
+                    seconds++;
+                }
+
+                if (seconds > 5) SetDMA(false);
             }
-            for (auto i : buf) delete i;
+            //SetDMA(false);
         }
     }
 };
