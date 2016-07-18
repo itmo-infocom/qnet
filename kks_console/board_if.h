@@ -98,19 +98,6 @@ using namespace std;
             top->RegRawWrite(reg); 
         }
 
-        //Установим в качестве источника ГСЧ TableRNG
-        {
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
-            reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
-            reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
-            
-            reg.value.raw &= ~(0b1 << 7);//Принимаем детектирования с настоящего детектора
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
-        }
-
         //Установим dma enable в ноль
         {
             AnBRegInfo reg;
@@ -217,8 +204,8 @@ using namespace std;
             if (status)
             {
                 //Включение
-                reg.value.raw |= 0b01;//Поднимем start-бит
                 reg.value.raw &= ~0b10;//Опустим stop-бит
+                reg.value.raw |= 0b01;//Поднимем start-бит
                 top->RegRawWrite(reg);
             } else
             {
@@ -336,7 +323,7 @@ using namespace std;
             {
                 top->DMARead(buf[i]);
                 if (((unsigned short int*)buf[i])[0] != prev && i != 0) cout << i << endl;
-                if (false)
+                if (true)
                 {
                     size_t s = stoi(argv[1]);
                     char *buf_loc = new char[s/4];
@@ -345,14 +332,14 @@ using namespace std;
                     {
                         int v = random() % 4;
                         buf_loc[i/4] += ((v & 0b11) << ((i % 4)*2));
-                        if (i % 4 == 0) cout << ' ';
-                        cout << (v & 0b11);
+                        // if (i % 4 == 0) cout << ' ';
+                        // cout << (v & 0b11);
                     }
-                    cout << endl;
+                    // cout << endl;
                     SetDMA(false);
-                    usleep(50000);
+                    // usleep(50000);
                     top->WriteTable(buf_loc, s/4, DestTables::TableRNG);
-                    usleep(50000);
+                    // usleep(50000);
                     SetDMA(true);
                     delete buf_loc;
                 };
@@ -360,7 +347,7 @@ using namespace std;
             }
             SetDMA(false);
 
-            //Вывод на экран первых слов каждого считанного фрейма
+            //Вывод на экран первого слова каждого считанного фрейма
             if (true)
             for (int i = 0; i < buf_count; i++)
             {
