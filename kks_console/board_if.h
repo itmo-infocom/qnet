@@ -98,6 +98,20 @@ using namespace std;
             top->RegRawWrite(reg); 
         }
 
+       //Установим в качестве источника ГСЧ TableRNG
+       if (false)
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawRead(reg);
+            reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
+            reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
+
+            reg.value.raw &= ~(0b1 << 7);//Принимаем детектирования с настоящего детектора
+            top->RegRawWrite(reg);
+            if (type) bottom->RegRawWrite(reg);
+        }
+
         //Установим dma enable в ноль
         {
             AnBRegInfo reg;
@@ -112,11 +126,7 @@ using namespace std;
 
     board_if::~board_if()
     {
-        if (DMAStatus)
-        {
-            top->DMADisable();
-            if (type) bottom->DMADisable();
-        }
+        if (DMAStatus) SetDMA(false);
     }
 
     detections board_if::get_detect(float t)
@@ -273,7 +283,7 @@ using namespace std;
             //Число прочитанных фреймов
             unsigned int readed = 0;
             while (seconds < 15) 
-            {
+            {   
                 if (clock() > seconds*CLOCKS_PER_SEC)
                     seconds++;
 
@@ -281,26 +291,27 @@ using namespace std;
                 {   
                     usleep(100); 
                     continue;
-                }
-
-                char *buf;
-                if (!top->DMARead(buf)) throw except(top->LastError());
-                cout << errno;
-                
-                cout << ++readed;
-
-                if (false)
+                } else
                 {
-                    unsigned int *p = (unsigned int*)buf;
-                    for (int i = 0; i < 1<<14; i++)
-                        if (((p[i]>>16) & 0xFFFF) == 0xABCD)
-                        {
-                            cout << " ABCD " << i;
-                            break;
-                        }
-                }   
-                cout << endl;
-                delete buf;
+                    char *buf = nullptr;
+                    if (!top->DMARead(buf)) throw except(top->LastError());
+                    cout << errno << ' ';
+                    cout << ++readed;
+
+                    if (buf != nullptr)
+                    if (true)
+                    {
+                        unsigned int *p = (unsigned int*)buf;
+                        for (int i = 0; i < 1<<14; i++)
+                            if (((p[i]>>16) & 0xFFFF) == 0xABCD)
+                            {
+                                cout << " ABCD " << i;
+                                break;
+                            }
+                        cout << endl;
+                        delete buf;
+                    }   
+                }
             }
 
             SetDMA(false);
