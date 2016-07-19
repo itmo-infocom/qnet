@@ -183,25 +183,28 @@ using namespace std;
         if (status)
         {
             //Поднимем start-бит
+            cout << "Поднимаем Start-бит" << endl;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
+            if (!top->RegRawRead(reg)) throw except(top->LastError());
             reg.value.raw |= 0b1;
-            top->RegRawWrite(reg);
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
 
+            cout << "DMAEnable" << endl;
             //Включим DMA
             if (!top->DMAEnable()) throw except(top->LastError());
         } else
         {
-            cout << "Выкл DMA" << endl;
+            cout << "DMADisable" << endl;
             if (!top->DMADisable()) throw except(top->LastError());
 
             //Опустим start-бит
+            cout << "Опускаем start-бит" << endl;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
+            if (!top->RegRawRead(reg)) throw except(top->LastError());
             reg.value.raw &= ~0b1;
-            top->RegRawWrite(reg);
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
 
             //Очистим буфер DMA в случае выключения
             if (!status)
@@ -212,7 +215,7 @@ using namespace std;
                 if (top->DMAIsReady())
                 {
                     char *buf;
-                    top->DMARead(buf);
+                    if (!top->DMARead(buf))  throw except(top->LastError());
                     delete buf;
                 }
             }
@@ -230,9 +233,9 @@ using namespace std;
             {
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
-                top->RegRawRead(reg);
+                if (!top->RegRawRead(reg)) throw except(top->LastError());
                 reg.value.table.mode = stoi(argv[2]);
-                top->RegRawWrite(reg);
+                if (!top->RegRawWrite(reg)) throw except(top->LastError());
             }
             
             //Заполнение TableRNG случайными числами
@@ -249,7 +252,7 @@ using namespace std;
                     //cout << (v & 0b11);
                 }
                 //cout << endl;
-                top->WriteTable(buf, s/4, DestTables::TableRNG);
+                if (!top->WriteTable(buf, s/4, DestTables::TableRNG)) throw except(top->LastError());
                 
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
@@ -271,8 +274,18 @@ using namespace std;
             unsigned int readed = 0;
             while (seconds < 15) 
             {
+                if (clock() > seconds*CLOCKS_PER_SEC)
+                    seconds++;
+
+                if (!top->DMAIsReady()) 
+                {   
+                    usleep(100); 
+                    continue;
+                }
+
                 char *buf;
                 if (!top->DMARead(buf)) throw except(top->LastError());
+                cout << errno;
                 
                 cout << ++readed;
 
@@ -288,9 +301,6 @@ using namespace std;
                 }   
                 cout << endl;
                 delete buf;
-
-                if (clock() > seconds*CLOCKS_PER_SEC)
-                    seconds++;
             }
 
             SetDMA(false);
