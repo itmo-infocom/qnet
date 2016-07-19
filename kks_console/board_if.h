@@ -297,29 +297,33 @@ using namespace std;
             SetDMA(true);
             unsigned int seconds = 0;//Число секунд с момента старта
             unsigned int readed = 0;//Число прочитанных фреймов
-            while (seconds < 30) 
+            while (seconds < 10) 
             {
-                
-                if (top->DMAIsReady())
+
+                char *buf;
+                top->DMARead(buf);
+                delete buf;
+                readed++;
+
+                if (false && top->DMAIsReady())
                 {
                     char *buf = nullptr;
                     top->DMARead(buf);
-                    //if (buf != nullptr) delete buf;
+                    if (buf != nullptr) delete buf;
                     
                     readed++;
                 }
                 
-                if (readed == 16) SetDMA(false);
-
                 if (clock() >= seconds*CLOCKS_PER_SEC)
                 {
                     cout << readed << endl;
                     seconds++;
                 }
 
-                if (seconds > 5) SetDMA(false);
+                //if (seconds > 5) SetDMA(false);
             }
-            //SetDMA(false);
+            
+            SetDMA(false);
         }
     }
 };
