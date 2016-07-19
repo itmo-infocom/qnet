@@ -98,19 +98,6 @@ using namespace std;
             top->RegRawWrite(reg); 
         }
 
-        //Установим в качестве источника ГСЧ TableRNG
-        {
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
-            reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
-            reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
-            
-            reg.value.raw &= ~(0b1 << 7);//Принимаем детектирования с настоящего детектора
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
-        }
-
         //Установим dma enable в ноль
         {
             AnBRegInfo reg;
@@ -119,25 +106,12 @@ using namespace std;
             top->RegRawWrite(reg);
             if (type) bottom->RegRawWrite(reg);
         }
+
         DMAStatus = false;
     }
 
     board_if::~board_if()
     {
-        //Если Алиса - генерим stop condition
-        if (!type) 
-        {
-            //Если Алиса
-            AnBRegInfo reg;
-            reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
-            reg.value.raw &= ~0b01;//опускаем start-condition регистр на всякий случай
-            reg.value.raw |= 0b10;//Поднимает регистр stop-condition
-            top->RegRawWrite(reg);
-            reg.value.raw &= ~0b10;//Опускаем регистр stop-condtition
-            top->RegRawWrite(reg);
-        }
-
         if (DMAStatus)
         {
             top->DMADisable();
@@ -206,48 +180,41 @@ using namespace std;
         if (status == DMAStatus) return; 
         DMAStatus = status;
 
-        cout << "Вкл/выкл DMA" << endl;
-        if (status) top->DMAEnable();
-        else top->DMADisable();
-
-        cout << "Start/stop" << endl;
-        //Дёрнем start/stop condition 
-        if (!type) 
+        if (status)
         {
+            //Поднимем start-бит
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
             top->RegRawRead(reg);
-           
-            if (status)
-            {
-                //Включение
-                reg.value.raw |= 0b01;//Поднимем start-бит
-                reg.value.raw &= ~0b10;//Опустим stop-бит
-                top->RegRawWrite(reg);
-            } else
-            {
-                //Выключение
-                reg.value.raw &= ~0b01;//Опускаем start-бит
-                reg.value.raw |= 0b10;//Поднимаем stop-бит
-                top->RegRawWrite(reg);
-                reg.value.raw &= ~0b10;//Опустим stop-бит
-                top->RegRawWrite(reg);
-            }
-        }
+            reg.value.raw |= 0b1;
+            top->RegRawWrite(reg);
 
-        //Дёрнем регистр dma.enabled не надо, т.к. это делается в модуле ядра
-
-        cout << "Clear DMA" << endl;
-        //Очистим буфер DMA в случае выключения
-        if (!status)
+            //Включим DMA
+            if (!top->DMAEnable()) throw except(top->LastError());
+        } else
         {
-            char *buf;
-            time_t finish = clock() + 100e-3*CLOCKS_PER_SEC;//Будем очищать всё, что приходит в буфер в течение 100 мс
-            while (clock() < finish)
-            if (top->DMAIsReady())
+            cout << "Выкл DMA" << endl;
+            if (!top->DMADisable()) throw except(top->LastError());
+
+            //Опустим start-бит
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTest;
+            top->RegRawRead(reg);
+            reg.value.raw &= ~0b1;
+            top->RegRawWrite(reg);
+
+            //Очистим буфер DMA в случае выключения
+            if (!status)
             {
-                top->DMARead(buf);
-                delete buf;
+                cout << "Clearing DMA" << endl;
+                time_t finish = clock() + 100e-3*CLOCKS_PER_SEC;//Будем очищать всё, что приходит в буфер в течение 100 мс
+                while (clock() < finish)
+                if (top->DMAIsReady())
+                {
+                    char *buf;
+                    top->DMARead(buf);
+                    delete buf;
+                }
             }
         }
     }
@@ -286,43 +253,46 @@ using namespace std;
                 
                 AnBRegInfo reg;
                 reg.address = AnBRegs::RegTable;
-                top->RegRawRead(reg);
+                if (!top->RegRawRead(reg))
+                cerr << "Cannot read table register" << endl;
                 reg.value.table.size = s;
-                top->RegRawWrite(reg);
+                if (!top->RegRawWrite(reg))
+                cerr << "Cannot write table register" << endl;
                 delete buf;
             };
 
             top->SetBuffersCount(16);
             
             SetDMA(true);
-            unsigned int seconds = 0;//Число секунд с момента старта
-            unsigned int readed = 0;//Число прочитанных фреймов
-            while (seconds < 10) 
+
+            //Число секунд с момента старта
+            unsigned int seconds = 0;
+            //Число прочитанных фреймов
+            unsigned int readed = 0;
+            while (seconds < 15) 
             {
-
                 char *buf;
-                top->DMARead(buf);
-                delete buf;
-                readed++;
-
-                if (false && top->DMAIsReady())
-                {
-                    char *buf = nullptr;
-                    top->DMARead(buf);
-                    if (buf != nullptr) delete buf;
-                    
-                    readed++;
-                }
+                if (!top->DMARead(buf)) throw except(top->LastError());
                 
-                if (clock() >= seconds*CLOCKS_PER_SEC)
-                {
-                    cout << readed << endl;
-                    seconds++;
-                }
+                cout << ++readed;
 
-                //if (seconds > 5) SetDMA(false);
+                if (false)
+                {
+                    unsigned int *p = (unsigned int*)buf;
+                    for (int i = 0; i < 1<<14; i++)
+                        if (((p[i]>>16) & 0xFFFF) == 0xABCD)
+                        {
+                            cout << " ABCD " << i;
+                            break;
+                        }
+                }   
+                cout << endl;
+                delete buf;
+
+                if (clock() > seconds*CLOCKS_PER_SEC)
+                    seconds++;
             }
-            
+
             SetDMA(false);
         }
     }
