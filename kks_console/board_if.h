@@ -282,38 +282,39 @@ using namespace std;
             unsigned int seconds = 0;
             //Число прочитанных фреймов
             unsigned int readed = 0;
-            while (seconds < 15) 
+            char *buf = nullptr;
+            while (readed < 100) 
             {   
                 if (clock() > seconds*CLOCKS_PER_SEC)
                     seconds++;
 
-                if (!top->DMAIsReady()) 
+                if (!top->DMAIsReady() & false) 
                 {   
-                    usleep(100); 
+                    usleep(1000); 
                     continue;
                 } else
                 {
-                    char *buf = nullptr;
+                    cout << 'R';
                     if (!top->DMARead(buf)) throw except(top->LastError());
+                    //delete buf;
+
                     cout << errno << ' ';
                     cout << ++readed;
 
-                    if (buf != nullptr)
-                    if (true)
+                    //if (false)
                     {
-                        unsigned int *p = (unsigned int*)buf;
-                        for (int i = 0; i < 1<<14; i++)
+                        unsigned int *p = (unsigned int *)buf;
+                        for (int i = (1<<14) - 1; i >= 0; i--)
                             if (((p[i]>>16) & 0xFFFF) == 0xABCD)
                             {
                                 cout << " ABCD " << i;
+                                cout << " count " << (p[i] & 0xFFFF);
                                 break;
                             }
                         cout << endl;
-                        delete buf;
                     }   
                 }
             }
-
             SetDMA(false);
         }
     }
