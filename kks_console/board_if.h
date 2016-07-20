@@ -197,7 +197,8 @@ using namespace std;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
             if (!top->RegRawRead(reg)) throw except(top->LastError());
-            reg.value.raw |= 0b1;
+            reg.value.raw |= 0b01;//Поднимаем start-бит
+            reg.value.raw &= ~0b10;//Опускаем stop-бит
             if (!top->RegRawWrite(reg)) throw except(top->LastError());
 
             cout << "DMAEnable" << endl;
@@ -208,12 +209,12 @@ using namespace std;
             cout << "DMADisable" << endl;
             if (!top->DMADisable()) throw except(top->LastError());
 
-            //Опустим start-бит
             cout << "Опускаем start-бит" << endl;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
             if (!top->RegRawRead(reg)) throw except(top->LastError());
-            reg.value.raw &= ~0b1;
+            reg.value.raw &= ~0b01;//Опускаем start-бит
+            reg.value.raw |= 0b10;//Поднимаем stop-бит
             if (!top->RegRawWrite(reg)) throw except(top->LastError());
 
             //Очистим буфер DMA в случае выключения
@@ -282,8 +283,7 @@ using namespace std;
             unsigned int seconds = 0;
             //Число прочитанных фреймов
             unsigned int readed = 0;
-            char *buf = nullptr;
-            while (readed < 100) 
+            while (readed < 20) 
             {   
                 if (clock() > seconds*CLOCKS_PER_SEC)
                     seconds++;
@@ -294,14 +294,13 @@ using namespace std;
                     continue;
                 } else
                 {
+                    char *buf = nullptr;
                     cout << 'R';
                     if (!top->DMARead(buf)) throw except(top->LastError());
-                    //delete buf;
 
                     cout << errno << ' ';
                     cout << ++readed;
 
-                    //if (false)
                     {
                         unsigned int *p = (unsigned int *)buf;
                         for (int i = (1<<14) - 1; i >= 0; i--)
@@ -312,6 +311,7 @@ using namespace std;
                                 break;
                             }
                         cout << endl;
+                        delete buf;
                     }   
                 }
             }
