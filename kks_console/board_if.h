@@ -259,10 +259,10 @@ using namespace std;
                 {
                     int v = random() % 4;
                     buf[i/4] += ((v & 0b11) << ((i % 4)*2));
-                    //if (i % 4 == 0) cout << ' ';
-                    //cout << (v & 0b11);
+                    if (i % 4 == 0) cout << ' ';
+                    cout << (v & 0b11);
                 }
-                //cout << endl;
+                cout << endl;
                 if (!top->WriteTable(buf, s/4, DestTables::TableRNG)) throw except(top->LastError());
                 
                 AnBRegInfo reg;
@@ -301,18 +301,24 @@ using namespace std;
                     cout << errno << ' ';
                     cout << ++readed;
 
+                    //if (false)
                     {
                         unsigned int *p = (unsigned int *)buf;
                         for (int i = (1<<14) - 1; i >= 0; i--)
-                            if (((p[i]>>16) & 0xFFFF) == 0xABCD)
+                        if ((p[i] & 0xFFFF) == 0)//Ищем фрейм с номером 0
+                        {
+                            //Выведем базисные состояния
+                            for (int w = 1; w <= stoi(argv[1])/8+1; w++)
                             {
-                                cout << " ABCD " << i;
-                                cout << " count " << (p[i] & 0xFFFF);
-                                break;
+                                short int tmp = p[w] & 0xFFFF;
+                                cout << ' ';
+                                for (int j = 0; j < 16; j+=2) cout << ((tmp >>j) & 0b11); 
                             }
-                        cout << endl;
-                        delete buf;
+                            break;
+                        }
                     }   
+                    cout << endl;
+                    delete buf;
                 }
             }
             SetDMA(false);
