@@ -265,15 +265,11 @@ using namespace std;
             
             SetDMA(true);
 
-            //Число секунд с момента старта
-            unsigned int seconds = 0;
+            clock_t start = clock();
             //Число прочитанных фреймов
             unsigned int readed = 0;
             while (readed < stoi(argv[3])) 
             {   
-                if (clock() > seconds*CLOCKS_PER_SEC)
-                    seconds++;
-
                 if (!top->DMAIsReady() & false) 
                 {   
                     usleep(1000); 
@@ -306,6 +302,7 @@ using namespace std;
                 }
             }
             SetDMA(false);
+            cout << "Скорость: " << (stoi(argv[3])*(1<<17)/(clock() - start)*(float)CLOCKS_PER_SEC) << " Мсэмпл/сек" << endl;
         }
     }
 };
