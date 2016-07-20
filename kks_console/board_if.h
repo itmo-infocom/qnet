@@ -216,20 +216,6 @@ using namespace std;
             reg.value.raw &= ~0b01;//Опускаем start-бит
             reg.value.raw |= 0b10;//Поднимаем stop-бит
             if (!top->RegRawWrite(reg)) throw except(top->LastError());
-
-            //Очистим буфер DMA в случае выключения
-            if (!status)
-            {
-                cout << "Clearing DMA" << endl;
-                time_t finish = clock() + 100e-3*CLOCKS_PER_SEC;//Будем очищать всё, что приходит в буфер в течение 100 мс
-                while (clock() < finish)
-                if (top->DMAIsReady())
-                {
-                    char *buf;
-                    if (!top->DMARead(buf))  throw except(top->LastError());
-                    delete buf;
-                }
-            }
         }
     }
 
@@ -238,7 +224,7 @@ using namespace std;
 
         if (true)
         {
-            if (argc < 2) return;
+            if (argc < 3) return;
 
             //Установка режима работы таблицы
             {
@@ -283,7 +269,7 @@ using namespace std;
             unsigned int seconds = 0;
             //Число прочитанных фреймов
             unsigned int readed = 0;
-            while (readed < 20) 
+            while (readed < stoi(argv[3])) 
             {   
                 if (clock() > seconds*CLOCKS_PER_SEC)
                     seconds++;
@@ -304,9 +290,9 @@ using namespace std;
                     //if (false)
                     {
                         unsigned int *p = (unsigned int *)buf;
-                        for (int i = (1<<14) - 1; i >= 0; i--)
-                        if ((p[i] & 0xFFFF) == 0)//Ищем фрейм с номером 0
-                        {
+                        cout << ' ' << hex << ((p[0] >> 16) & 0xFFFF);
+                        cout << ' ' << dec << (p[0] & 0xFFFF);
+                        if ((p[0] & 0xFFFF) == 0 || true)
                             //Выведем базисные состояния
                             for (int w = 1; w <= stoi(argv[1])/8+1; w++)
                             {
@@ -314,8 +300,6 @@ using namespace std;
                                 cout << ' ';
                                 for (int j = 0; j < 16; j+=2) cout << ((tmp >>j) & 0b11); 
                             }
-                            break;
-                        }
                     }   
                     cout << endl;
                     delete buf;
