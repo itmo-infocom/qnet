@@ -179,6 +179,7 @@ using namespace std;
 
     void board_if::TableRNG(const std::vector<int> t)
     {
+        //Размер таблицы должен быть больше 8. При размере меньшем восьми работа немного непредсказуема - не понимаю кто куда уходит.
         using namespace std;
         
         //Сформируем буфер для записи в плату
@@ -188,7 +189,12 @@ using namespace std;
             for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
 
             for (size_t i = 0; i < t.size(); i++)
-                buf[i/4] |= (t[i] & 0b11) << ((i % 4)*2);
+            {
+                //Мулька в том, что после инициализации старта TableRNG начинает считываьтся с 9 элемента - поэтому запишем TableRNG с этим смещением
+                const size_t offset = 9;
+                size_t pos = t.size() + offset;  
+                buf[i/4] |= (t[(i+offset)%t.size()] & 0b11) << ((i % 4)*2);
+            }
 
             if (!top->WriteTable(buf, buf_size, DestTables::TableRNG))
                 throw except(top->LastError());
