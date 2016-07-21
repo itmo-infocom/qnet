@@ -280,6 +280,7 @@ using namespace std;
                 cout << ++readed;
 
                 //if (false)
+
                 {
                     unsigned int *p = (unsigned int *)buf;
                     cout << ' ' << hex << ((p[0] >> 16) & 0xFFFF);
