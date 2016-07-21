@@ -152,7 +152,6 @@ using namespace std;
         //Исходим из предположения, что плата не запущена и не включен DMA
         //Также исходим из предположения, что TableRNG уже сконфигурирована как надо
         //Инициализируем DMA
-        top->DMAEnable();
         AnBRegInfo reg;
         reg.value.dma.enabled = 1;
         reg.address = AnBRegs::RegDMA;
@@ -248,6 +247,7 @@ using namespace std;
             reg.value.raw &= ~0b01;//Опускаем start-бит
             reg.value.raw |= 0b10;//Поднимаем stop-бит
             if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            usleep(100e3);//Задержка чтобы параллельные потоки успели тормознуть DMA и не возникало race conditions
         }
     }
 
@@ -272,36 +272,29 @@ using namespace std;
             unsigned int readed = 0;
             while (readed < stoi(argv[2])) 
             {   
-                if (!top->DMAIsReady() & false) 
-                {   
-                    usleep(1000); 
-                    continue;
-                } else
+                char *buf = nullptr;
+                //cout << 'R';
+                if (!top->DMARead(buf)) throw except(top->LastError());
+
+                //cout << errno << ' ';
+                cout << ++readed;
+
+                //if (false)
                 {
-                    char *buf = nullptr;
-                    //cout << 'R';
-                    if (!top->DMARead(buf)) throw except(top->LastError());
-
-                    //cout << errno << ' ';
-                    cout << ++readed;
-
-                    //if (false)
-                    {
-                        unsigned int *p = (unsigned int *)buf;
-                        cout << ' ' << hex << ((p[0] >> 16) & 0xFFFF);
-                        cout << ' ' << dec << (p[0] & 0xFFFF);
-                        if ((p[0] & 0xFFFF) == 0 || true)
-                            //Выведем базисные состояния
-                            for (int w = 1; w <= stoi(argv[1])/8+1; w++)
-                            {
-                                short int tmp = p[w] & 0xFFFF;
-                                cout << ' ';
-                                for (int j = 0; j < 16; j+=2) cout << ((tmp >>j) & 0b11); 
-                            }
-                    }   
-                    cout << endl;
-                    delete buf;
-                }
+                    unsigned int *p = (unsigned int *)buf;
+                    cout << ' ' << hex << ((p[0] >> 16) & 0xFFFF);
+                    cout << ' ' << dec << (p[0] & 0xFFFF);
+                    if ((p[0] & 0xFFFF) == 0 || true)
+                        //Выведем базисные состояния
+                        for (int w = 1; w <= stoi(argv[1])/8+1; w++)
+                        {
+                            short int tmp = p[w] & 0xFFFF;
+                            cout << ' ';
+                            for (int j = 0; j < 16; j+=2) cout << ((tmp >>j) & 0b11); 
+                        }
+                }   
+                cout << endl;
+                delete buf;
             }
             SetDMA(false);
             cout << "Скорость: " << (stoi(argv[2])*(1<<17)/(clock() - start)*(float)CLOCKS_PER_SEC) << " Мсэмпл/сек" << endl;
