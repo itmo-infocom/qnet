@@ -34,7 +34,6 @@ int main( int argc, char** argv )
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;
 	}
-	
 }
 
 void brd_test(board_if::board_if &brd, int argc, char** argv)

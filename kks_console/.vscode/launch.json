@@ -8,7 +8,7 @@
             "launchOptionType": "Local",
             "targetArchitecture": "x64",
             "program": "${workspaceRoot}/alice.out",
-            "args": [],
+            "args": ["16 4 10"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],

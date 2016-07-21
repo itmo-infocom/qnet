@@ -24,6 +24,7 @@ using namespace std;
 
     class board_if
     {
+        const double frequency = 1e7;//Частота работы ПЛИС - необходимо для выбора размера буфера
         bool type;//Тип устройства
         bool DMAStatus;//Текущий статус DMA
         device_list devices;//Список всех подключённых устройства
@@ -53,7 +54,7 @@ using namespace std;
         detections get_detect(float t);
 
         //Записывает таблицу случайных чисел из вектора
-        void TableRNG(vector<unsigned short int> table);
+        void TableRNG(vector<int> table);
 
         //Устанавливает или считывает статус DMA
         bool GetDMA() {return DMAStatus;};
@@ -95,7 +96,9 @@ using namespace std;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegSTB;
             reg.value.raw = 0;
-            top->RegRawWrite(reg); 
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            if (type)
+                if (!bottom->RegRawWrite(reg)) throw except(bottom->LastError());
         }
 
        //Установим в качестве источника ГСЧ TableRNG
@@ -103,13 +106,14 @@ using namespace std;
         {
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTest;
-            top->RegRawRead(reg);
+            if (!top->RegRawRead(reg)) throw except(top->LastError());
             reg.value.raw |= 0b1 << 31;//Отключил использование внешнего ГСЧ (LVDS) 
             reg.value.raw &= ~(0b1 << 30);//Включил использование таблицы TableRNG
 
             reg.value.raw &= ~(0b1 << 7);//Принимаем детектирования с настоящего детектора
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            if (type) 
+                if (!bottom->RegRawWrite(reg)) throw except(bottom->LastError());
         }
 
         //Установим dma enable в ноль
@@ -117,9 +121,22 @@ using namespace std;
             AnBRegInfo reg;
             reg.address = AnBRegs::RegDMA;
             reg.value.dma.enabled = 0;
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            if (type) 
+                if (!bottom->RegRawWrite(reg)) throw except(bottom->LastError());
         }
+
+        //Установка режима работы таблицы
+        {
+            AnBRegInfo reg;
+            reg.address = AnBRegs::RegTable;
+            if (!top->RegRawRead(reg)) throw except(top->LastError());
+            reg.value.table.mode = 4;
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            if (type)
+                if (!bottom->RegRawWrite(reg)) throw except(top->LastError());
+        }
+        top->SetBuffersCount(frequency/(1<<16));//Буферов на 2 секунды
 
         DMAStatus = false;
     }
@@ -127,6 +144,7 @@ using namespace std;
     board_if::~board_if()
     {
         if (DMAStatus) SetDMA(false);
+        //TODO: Надо запихнуть запись конфигурации в файл
     }
 
     detections board_if::get_detect(float t)
@@ -159,30 +177,38 @@ using namespace std;
         return answer;
     };
 
-    void board_if::TableRNG(std::vector<unsigned short int> t)//TODO: Переделать в простой int
+    void board_if::TableRNG(const std::vector<int> t)
     {
         using namespace std;
-        size_t buf_size = t.size()/4 + ((t.size()%4)?1:0);
-        char *buf = new char[buf_size];
-        for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
+        
+        //Сформируем буфер для записи в плату
+        {
+            size_t buf_size = t.size()/4 + ((t.size()%4)?1:0);
+            char *buf = new char[buf_size];
+            for (size_t i = 0; i < buf_size; i++) buf[i] = 0;
 
-        for (size_t i = 0; i < t.size(); i++)
-            buf[i/4] += (t[i] >> (i % 4)) & 0b11;
+            for (size_t i = 0; i < t.size(); i++)
+                buf[i/4] |= (t[i] & 0b11) << ((i % 4)*2);
 
-        top->WriteTable(buf, buf_size, DestTables::TableRNG);
-        if (type) bottom->WriteTable(buf, buf_size, DestTables::TableRNG);
+            if (!top->WriteTable(buf, buf_size, DestTables::TableRNG))
+                throw except(top->LastError());
+            if (type) 
+                if (!bottom->WriteTable(buf, buf_size, DestTables::TableRNG)) 
+                    throw except(bottom->LastError()); 
+            delete buf;
+        }
 
         //Зафиксируем размер таблицы в регистрах ПЛИС
         {  
             AnBRegInfo reg;
             reg.address = AnBRegs::RegTable;
-            top->RegRawRead(reg);
+            if (!top->RegRawRead(reg)) throw except(top->LastError());
             reg.value.table.size = t.size();
-            top->RegRawWrite(reg);
-            if (type) bottom->RegRawWrite(reg);
+            if (!top->RegRawWrite(reg)) throw except(top->LastError());
+            if (type)
+                if (!bottom->RegRawWrite(reg)) throw except(bottom->LastError());
         }
 
-        delete buf;
     }
 
     void board_if::SetDMA(bool status)
@@ -224,51 +250,21 @@ using namespace std;
 
         if (true)
         {
-            if (argc < 3) return;
+            if (argc < 2) return;
 
-            //Установка режима работы таблицы
             {
-                AnBRegInfo reg;
-                reg.address = AnBRegs::RegTable;
-                if (!top->RegRawRead(reg)) throw except(top->LastError());
-                reg.value.table.mode = stoi(argv[2]);
-                if (!top->RegRawWrite(reg)) throw except(top->LastError());
+                vector<int> tmp;
+                tmp.resize(stoi(argv[1]));
+                for (size_t i = 0; i < tmp.size(); i++) tmp[i] = random();
+                TableRNG(tmp);
             }
-            
-            //Заполнение TableRNG случайными числами
-            if (true)
-            {
-                size_t s = stoi(argv[1]);
-                char *buf = new char[s/4];
-                for (int i = 0; i < s/4; i++) buf[i] = 0;
-                for (int i = 0; i < s; i++)
-                {
-                    int v = random() % 4;
-                    buf[i/4] += ((v & 0b11) << ((i % 4)*2));
-                    if (i % 4 == 0) cout << ' ';
-                    cout << (v & 0b11);
-                }
-                cout << endl;
-                if (!top->WriteTable(buf, s/4, DestTables::TableRNG)) throw except(top->LastError());
-                
-                AnBRegInfo reg;
-                reg.address = AnBRegs::RegTable;
-                if (!top->RegRawRead(reg))
-                cerr << "Cannot read table register" << endl;
-                reg.value.table.size = s;
-                if (!top->RegRawWrite(reg))
-                cerr << "Cannot write table register" << endl;
-                delete buf;
-            };
 
-            top->SetBuffersCount(16);
-            
             SetDMA(true);
 
             clock_t start = clock();
             //Число прочитанных фреймов
             unsigned int readed = 0;
-            while (readed < stoi(argv[3])) 
+            while (readed < stoi(argv[2])) 
             {   
                 if (!top->DMAIsReady() & false) 
                 {   
@@ -277,10 +273,10 @@ using namespace std;
                 } else
                 {
                     char *buf = nullptr;
-                    cout << 'R';
+                    //cout << 'R';
                     if (!top->DMARead(buf)) throw except(top->LastError());
 
-                    cout << errno << ' ';
+                    //cout << errno << ' ';
                     cout << ++readed;
 
                     //if (false)
@@ -302,7 +298,7 @@ using namespace std;
                 }
             }
             SetDMA(false);
-            cout << "Скорость: " << (stoi(argv[3])*(1<<17)/(clock() - start)*(float)CLOCKS_PER_SEC) << " Мсэмпл/сек" << endl;
+            cout << "Скорость: " << (stoi(argv[2])*(1<<17)/(clock() - start)*(float)CLOCKS_PER_SEC) << " Мсэмпл/сек" << endl;
         }
     }
 };
