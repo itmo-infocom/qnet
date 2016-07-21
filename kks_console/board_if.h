@@ -14,7 +14,8 @@
 #include "./driverAnB/src/lib/AnBDefs.h"
 #include "./driverAnB/src/lib/driver.h"
 #include "./driverAnB/src/lib/driver.cpp"
-#include "DMAFrame.h"
+//#include "DMAFrame.h"
+#include "detections.cpp"
 
 namespace board_if
 {
@@ -30,7 +31,22 @@ using namespace std;
         device_list devices;//Список всех подключённых устройства
         AnBDriverAPI *top, *bottom;//Верхняя и нижняя платы
        
-        std::vector<DMAFrame> DMAFrames;//TODO: Переделать в структуру, которая хранит и сможет возвращать непрерывный поток бит или выдавать нужные биты по номеру или по поиску detections
+        unsigned short int num_next_frame = 0;//Номер следующего фрейма, подлежащего считыванию. Необходим для обнаружения переполнения буфера.
+
+        struct DMAFrame
+        {
+            DMAFrame(char *buf)
+            {
+                p = (unsigned int *)buf;
+                count = p[0] & 0xFFFF;
+            };
+            unsigned short int count;
+            //Возвращает базисное состояние с позиции bs_at в пределах данного фрейма
+            uint8_t bs_at(unsigned int pos) {return (p[pos/8] >> ((pos%8)*2)) & 0b11;};
+        private:
+            unsigned int *p;
+        } *curr_frame;
+        bool curr_frame_initialized = false;
     public:
         //Структура для обработки исключений
         struct except{
@@ -50,18 +66,24 @@ using namespace std;
         board_if() throw(except);
         ~board_if();
 
-        //Возвращает detections за t миллисекунд
-        detections get_detect(float t);
+        //Возвращает базисные состояния на позициях count, начиная с нулевого отсчёта нулевого фрейма. Калибровки и метки ABCD не учитываются
+        detections get_detect(vector<unsigned int> count);
 
         //Записывает таблицу случайных чисел из вектора
         void TableRNG(vector<int> table);
 
         //Устанавливает или считывает статус DMA
-        bool GetDMA() {return DMAStatus;};
+        bool StatusDMA() {return DMAStatus;};
         void SetDMA(bool status);
 
         //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
         void StoreDMA(double t, int argc, char** argv);
+
+        //Устанавливает размер буфера DMA драйвера в секундах
+        void SetBufSize(float t) {top->SetBuffersCount(t*frequency/(1<<17)+1);};
+
+        //Удаляет фреймы DMA, пока не повстречает фрейм с нулевым номером - он будет сохранён в *curr_frame
+        void clear_buf(void);
     };
 
     board_if::board_if() throw(except)
@@ -147,31 +169,28 @@ using namespace std;
         //TODO: Надо запихнуть запись конфигурации в файл
     }
 
-    detections board_if::get_detect(float t)
+    detections board_if::get_detect(vector<unsigned int> count)
     {
-        //Исходим из предположения, что плата не запущена и не включен DMA
-        //Также исходим из предположения, что TableRNG уже сконфигурирована как надо
-        //Инициализируем DMA
-        AnBRegInfo reg;
-        reg.value.dma.enabled = 1;
-        reg.address = AnBRegs::RegDMA;
         detections answer;
-        top->RegRawWrite(reg);//Стартовал DMA
-        
-        clock_t start = clock();
-        while ((clock()-start)/(CLOCKS_PER_SEC*1e-3) < t)
+
+        for (auto i : count)
         {
-            char *buf;
-            top->DMARead(buf);
-            //TODO: Сделать так, чтобы не парсить все отсчёты, а брать из буфера только те, которые сработали на Бобе
-            answer.append(DMAFrame(buf).to_detections(type));
+            while(curr_frame->count < i/(AnBBufferMinSize*2))
+            {
+                if (curr_frame_initialized) delete curr_frame;
+                char *buf;
+                if (!top->DMARead(buf)) throw except(top->LastError());
+                curr_frame = new DMAFrame(buf);
+            }
+
+            if (curr_frame->count == i / (AnBBufferMinSize*2))
+            {
+                uint8_t bs_tmp = curr_frame->bs_at(i % (AnBBufferMinSize*2));
+
+                answer.basis.push_back(bs_tmp & 0b01);
+                answer.key.push_back(bs_tmp & 0b10);
+            }
         }
-
-        reg.value.dma.enabled = 0;
-        top->RegRawWrite(reg);//Остановили DMA
-
-        if (type) 
-            answer.count.pop_back();//Удалим последний элемент, который используется для сшивки. Актуально только для Боба
 
         return answer;
     };
@@ -300,6 +319,16 @@ using namespace std;
             SetDMA(false);
             cout << "Скорость: " << (stoi(argv[2])*(1<<17)/(clock() - start)*(float)CLOCKS_PER_SEC) << " Мсэмпл/сек" << endl;
         }
+    }
+
+    void board_if::clear_buf()
+    {
+        if (curr_frame_initialized) delete curr_frame;
+        do {
+            char *buf;
+            if (!top->DMARead(buf)) throw except(top->LastError());
+            curr_frame = new DMAFrame(buf);
+        } while(curr_frame->count != 0);
     }
 };
 

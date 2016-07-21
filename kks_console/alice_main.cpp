@@ -9,16 +9,12 @@
 //#include "NetWork.h"
 #include "detections.cpp"
 
-//#include "common_func.cpp"
+#include "common_func.cpp"
 
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
-//Алгоритм генерации ключа
-//void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &bob) throw();
-
-//Приводит сплошной массив Алисы к разреженному как у Боба
-//detections raw_detect_to_count(detections &alice, detections &bob);
-void brd_test(board_if::board_if &brd, int argc, char** argv);
+	//Алгоритм генерации ключа
+	void generation_key(board_if::board_if &brd);//TODO: добавить ссылку на сокет
 
 //---------------------------------------
 //Точка входа
@@ -27,7 +23,7 @@ int main( int argc, char** argv )
 	using namespace std;
 	try{
 		board_if::board_if brd;
-		brd_test(brd, argc, argv);
+		generation_key(brd);
 	}
 	catch(board_if::board_if::except &obj)
 	{
@@ -36,20 +32,33 @@ int main( int argc, char** argv )
 	}
 }
 
-void brd_test(board_if::board_if &brd, int argc, char** argv)
+void generation(board_if::board_if &brd)
 {
 	using namespace std;
-	//Для начала попробуем записать TableRNG
+	
+	brd.SetDMA(false);//TODO: В документации упомянуть, что нельзя работать с регистрами одновременно с работой DMA
+
+	//Запись full-rnd в TableRNG
 	{
-		vector<unsigned short int> table_rng(20);
-		for (unsigned int i = 0; i < table_rng.size(); i++) table_rng[i] = 0; 
-		//brd.TableRNG(table_rng);
+		srand(time(0));
+		vector<int> tmp(AnBTableMaxSize);
+		for (size_t i = 0; i < tmp.size(); i++)
+			tmp[i] = random();
+		brd.TableRNG(tmp);
 	}
 
+	brd.SetDMA(true);
+	brd.clear_buf();
+	
+	//while (bob.regime() == regimes::gen_key)
 	{
-		brd.StoreDMA(1000, argc, argv);
+		//Принимаем detections от боба
+		detections bob_detect;
+		//bob.recv(bob_detect);
 
-		int x;
-		x++;
+		//Вытащим нужные отсчеты из своего DMA
+		detections my_detect = brd.get_detect(bob_detect.count);
 	}
+
+	brd.SetDMA(false);
 }
