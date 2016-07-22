@@ -27,5 +27,13 @@
 			special.insert(special.end(), other.special.begin(), other.special.end());
 			count.insert(count.end(), other.count.begin(), other.count.end());
 		};
+
+		void operator= (detections &other)
+		{
+			basis = other.basis;
+			key = other.key;
+			special = other.special;
+			count = other.count;
+		};
 	};
 #endif // !DETECTIONS_CPP

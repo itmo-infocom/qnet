@@ -2,6 +2,7 @@
 #include <iostream>
 #include <errno.h>//Для использования errno
 #include <string.h>//Ради strerror
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,39 @@ void generation(board_if::board_if &brd)
 
 		//Вытащим нужные отсчеты из своего DMA
 		detections my_detect = brd.get_detect(bob_detect.count);
+
+		//Отправим detections Бобу, предварительно удалив ключи
+		{
+			detections to_send = my_detect;
+			to_send.key.clear(); 
+			//bob.send(to_send);
+		} 
+
+		vector<bool> key = sift_key(my_detect, bob_detect);
+		
+		unsigned int seed_qber;
+		vector<bool> qber_key = get_qber_key(key, seed_qber);
+		
+		//bob.send(seed_qber);
+		//bob.send(qber_key);
+
+		//Принимаем от боба код ошибки.
+		errors errcode; 
+		//bob.recv(errcode)
+		if (errcode == errors::qber) throw errcode;
+
+		//Примем код Хэмминга
+		vector<bool> ham_code;
+		//bob.recv(ham_code);
+		//key = decode(key, ham_code);
+
+		//Сформируем команду для отправки curl-запроса потребителю.
+		//Ключ передаётся в шестнадцатеричном виде в видe ascii-текста 
+		{
+			string cmd = "curl --data ";
+			stringstream ss;
+			
+		} 
 	}
 
 	brd.SetDMA(false);

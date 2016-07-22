@@ -2,6 +2,8 @@
 #define COMMON_CPP
 
 #include <vector>
+#include <stdlib.h>
+#include <time.h>
 
 #include "detections.cpp"
 
@@ -15,36 +17,43 @@ enum regimes
 	regimes_size
 };
 
-std::vector<bool> sift_key(const detections &my, const detections &other, double &qber)
+enum errors
 {
-	using namespace std;
-	unsigned int err_count = 0;//Число несовпавших бит qber
-	unsigned int qber_count = 0;//Число бит, использованных для нахождения ключа 
-	vector<bool> answer;
-	unsigned int pos = 0;
+	ok,
+	qber,
 
-	for (size_t i = 0; i < my.key.size(); i++)
-	{
-		if (other.special[i])
-		{
-			qber_count++;
-			if (my.key[pos] != other.key[i]) err_count++;
-			continue; 
-		}
-		if (my.basis[pos] == other.basis[i])
-		answer.push_back(my.key[pos]);
-	}
+	errors_size
+};
 
-	qber = (double)err_count/qber_count;
+//Возвращает ключ, отфильтрованный по базису
+std::vector<bool> sift_key(const detections &my, const detections &other)
+{
+	std::vector<bool> answer;
+
+	for (std::size_t i = 0; i < other.key.size(); i++)
+		if (other.basis[i] == my.basis[i]) answer.push_back(my.key[i]);	
 
 	return answer;
 }
 
-//Возвращает пырк
-std::vector<unsigned int> pyrk(std::size_t size)
+std::vector<bool> get_qber_key(std::vector<bool> &key, unsigned int &seed)
 {
-	using namespace std;
-	vector<unsigned int> answer;
+	const double part = 0.1;
+
+	seed = time(NULL);
+	srandom(seed);
+
+	std::vector<bool> answer;
+
+	size_t size = key.size();
+	answer.reserve(size*part);
+	for (size_t i = 0; i < size*part; i++)
+	{
+		size_t pos = random()%size; 
+		answer.push_back(key[pos]);
+		key.erase(key.begin() + pos);
+	}
+
 	return answer;
 }
 #endif // ! COMMON_CPP

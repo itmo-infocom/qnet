@@ -189,6 +189,7 @@ using namespace std;
 
                 answer.basis.push_back(bs_tmp & 0b01);
                 answer.key.push_back(bs_tmp & 0b10);
+                answer.count.push_back(i);
             }
         }
 
