@@ -1,0 +1,1 @@
+cmd_/home/snuffick/Photon/rpmbuild/BUILD/module/AnB.ko := ld -r -m elf_x86_64 -T /usr/src/kernels/3.10.0-327.10.1.el7.x86_64/scripts/module-common.lds --build-id  -o /home/snuffick/Photon/rpmbuild/BUILD/module/AnB.ko /home/snuffick/Photon/rpmbuild/BUILD/module/AnB.o /home/snuffick/Photon/rpmbuild/BUILD/module/AnB.mod.o
