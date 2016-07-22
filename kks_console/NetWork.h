@@ -1,11 +1,11 @@
 #ifndef SOCKETS_CPP
 #define SOCKETS_CPP
 
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h> 
 #include <sys/types.h>
-#include <netdb.h>//Для работы gethostbyname()
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <pthread.h>
 #include <linux/futex.h>
@@ -14,12 +14,41 @@
 #include <unistd.h>
 #include <vector>
 
-//#include "common_func.cpp"
+#include "common_func.cpp"
 #include "detections.cpp"
 
 namespace NetWork
 {
 	using namespace std;
+
+	//В данном пространстве имён определены переменные и типы, необходимые для работы сокета. Работа с ними напрямую не рекоммендуется.
+	namespace details {
+	}
+	
+	//Структура для обработки исключений
+	struct except{
+		std::string errstr;
+		except(string e)//e - имя функции, вобудившей исключение
+		{
+			errstr = e; errstr += ": ";
+			errstr += gai_strerror(errno);
+		}
+	};
+
+	class client
+	{
+	public:
+		client(char *_hostname, char *_port);
+		~client();
+	private:
+		//Файловый дескриптора сокета
+		int fd;
+		string hostname;
+		string port;
+
+		//Процедура выполняющая подключение к hostname через порт port
+		void connection_sequence(void);
+	};
 	static void *acception( void* arg );//Существует в отдельном потоке и принимает входящие подключения - создаётся только для сервера
 
 	enum peers
@@ -27,7 +56,6 @@ namespace NetWork
 		alice,
 		bob,
 		gui,
-		telnet,
 		
 		peers_size
 	};
@@ -68,15 +96,6 @@ namespace NetWork
 		//Список команд, которые передаём по сети
 		enum NetComds
 		{
-		};
-
-		struct except{
-			std::string errstr;
-			except(string e)//e - имя функции, вобудившей исключение
-			{
-				errstr = e; errstr += ": ";
-				errstr += gai_strerror(errno);
-			}
 		};
 	private:
 		int fd;//Дескриптор сокета
@@ -180,26 +199,29 @@ namespace NetWork
 		pthread_create( &thread_acception, NULL, &acception, &fd );
 	};
 
-	NetWork::NetWork( char* _hostname, char* _port )
+	client::client(char *_hostname, char *_port)
 	{
 		fd = -1;
 		hostname = _hostname;
 		port = _port;
-		server = false;
-		
+
+		connection_sequence();
+	}
+
+	void client::connection_sequence(void)
+	{
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_flags = 0;
 		hints.ai_protocol = 0;
 		
-		struct addrinfo *res = nullptr;
+		struct addrinfo *res = nullptr;//Здесь будут все возможные варианты, подходящие под hostname
 
-		if ( getaddrinfo( _hostname, _port, &hints, &res ) != 0 ) 
+		if ( getaddrinfo( hostname.c_str(), port.c_str(), &hints, &res ) != 0 )
 			throw except("getaddrinfo");
 		
-		struct addrinfo *rp;//Результат у
-
+		struct addrinfo *rp;
 		while(fd == -1)
 		{
 			for ( rp = res; rp != NULL; rp = rp->ai_next ) 
@@ -217,8 +239,6 @@ namespace NetWork
 			}
 		}
 		
-
-
 		if (rp == NULL) /* Ни один из адресов за все попытки не подошёл */
 			throw except("Cannot connect");
 
