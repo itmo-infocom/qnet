@@ -10,11 +10,20 @@
 #include "detections.cpp"
 
 #include "common_func.cpp"
+#include "FFT_CODE/complex.h"
+#include "FFT_CODE/fft.cpp"
+//---------------------------------------
+//Глобальные переменные и константы
 
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 //Алгоритм генерации ключа
 void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server) throw();
+//Прототипы функций
+
+	vector<bool> key_sift(detections &alice, detections &bob); //Просеивание ключа
+	float calib_max(int* arr); //Выдает положение максимума в радианах
+
 //---------------------------------------
 //Точка входа
 int main( void )
@@ -105,3 +114,29 @@ void gen_key_alg(board_if::board_if &brd, NetWork::NetWork &server) throw()
 		cmd += URL;
 	}
 }
+
+	//Функция просеивания ключа. Возвращает <vector> с уже просеянным ключем.
+	vector<bool> key_sift(detections &alice, detections &bob) //Просеивание ключа
+	{
+	   vector<bool> temp; //Сюда собирается ключ
+	   for (unsigned int i=0; i<alice.basis.size(); i++) 
+	      {
+		 if (alice.basis[i]==bob.basis[i]) //Если базисы совпадают, то добавляем бит из ключа 
+		    { 
+		       temp.push_back(bob.key[i]);
+		    }
+	      }
+	return temp;
+	}
+
+	//Нахождение калибровочного максимума в радианах. На вход целочисленный массив
+	float calib_max(int* arr)
+	{
+	   complex cplx_arr[128];
+	   for (int i=0; i<128; i++)   //Конвертирование целосчисленного входного массива в массив типа complex (ТАК НАДО)
+	      {
+		 cplx_arr[i]=arr[i];
+	      }
+	   CFFT::Forward(cplx_arr, 128); //Быстрое преобразование Фурье. Массив типа complex на вход, 128 элементов в массиве
+	   return M_PI_2+atan(cplx_arr[1].im()/cplx_arr[1].re());
+	}
