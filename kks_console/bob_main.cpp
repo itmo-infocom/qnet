@@ -51,43 +51,40 @@ void generation(board_if::board_if &brd)
 		brd.TableRNG(tmp);
 	}
 
+	brd.SetBufSize(2*collect_time);
 	brd.SetDMA(true);
 	brd.clear_buf();//Удаление всех фреймов, пока не встретим с номером ноль
 	
-	//while (bob.regime() == regimes::gen_key)
+	//while (curr_regime == regimes::gen_key)
 	{
-		
-		//Принимаем detections от боба
-		detections bob_detect;
-		//bob.recv(bob_detect);
+		detections my_detect = brd.detects(collect_time);//Будем собирать детектирования в течение одной секунды
+		//alice.send(my_detect);
+		detections alice_detect;
+		//alice.recv(alice_detect);
 
-		//Вытащим нужные отсчеты из своего DMA
-		detections my_detect = brd.get_detect(bob_detect.count);
+		vector<bool> key = sift_key(my_detect, alice_detect);
 
-		//Отправим detections Бобу, предварительно удалив ключи
+		//Вычисление qber
 		{
-			detections to_send = my_detect;
-			to_send.key.clear(); 
-			//bob.send(to_send);
-		} 
+			unsigned int seed_qber;
+			//alice.recv(seed_qber);
+			vector<bool> qber_key = get_qber_key(key, seed_qber);
+			vector<bool> alice_qber_key;
+			//alice.recv(alice_qber_key);
+			size_t mismatch = 0;//Число несовпадающих бит
+			for (size_t i = 0; i < qber_key.size(); i++)
+			if (qber_key[i] != alice_qber_key[i]) mismatch++;
+			
+			if ((double)mismatch/qber_key.size() > max_qber)
+			{
+				errors errcode = errors::qber;
+				//alice.send(errcode);
+				throw errcode;
+			}
+		}
 
-		vector<bool> key = sift_key(my_detect, bob_detect);
-		
-		unsigned int seed_qber;
-		vector<bool> qber_key = get_qber_key(key, seed_qber);
-		
-		//bob.send(seed_qber);
-		//bob.send(qber_key);
-
-		//Принимаем от боба код ошибки.
-		errors errcode; 
-		//bob.recv(errcode)
-		if (errcode == errors::qber) throw errcode;
-
-		//Примем код Хэмминга
-		vector<bool> ham_code;
-		//bob.recv(ham_code);
-		//key = HamDecode(key, ham_code);
+		//Формируем код Хэмминга и отправляем его Алисе
+		//alice.send(HammingCode(key));
 
 		//Сформируем команду для отправки curl-запроса потребителю.
 		//Ключ передаётся в шестнадцатеричном виде в видe ascii-текста

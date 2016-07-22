@@ -85,6 +85,11 @@ using namespace std;
         board_if() throw(except);
         ~board_if();
 
+        //Устанавливает размер буфера, который способен хранить фреймы за время collect_time.
+        //collect_time устанавливается в миллисекундах
+        void setBufSize(double collect_time)
+        {top->SetBuffersCount(collect_time * 1e-3 * frequency / (1<<17));}
+    
         //Возвращает базисные состояния на позициях count, начиная с нулевого отсчёта нулевого фрейма. Калибровки и метки ABCD не учитываются
         detections get_detect(vector<unsigned int> count);
         
@@ -180,7 +185,6 @@ using namespace std;
             if (type)
                 if (!bottom->RegRawWrite(reg)) throw except(top->LastError());
         }
-        top->SetBuffersCount(frequency/(1<<16));//Буферов на 2 секунды
 
         DMAStatus = false;
     }

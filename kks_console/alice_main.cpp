@@ -48,6 +48,7 @@ void generation(board_if::board_if &brd)
 		brd.TableRNG(tmp);
 	}
 
+	brd.setBufSize(2*collect_time);
 	brd.SetDMA(true);
 	brd.clear_buf();
 	
