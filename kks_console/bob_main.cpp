@@ -36,7 +36,7 @@ int main( int argc, char** argv )
 	}
 }
 
-void generation(board_if::board_if &brd)
+void generation_key(board_if::board_if &brd)
 {
 	using namespace std;
 	
