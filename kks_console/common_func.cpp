@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "detections.cpp"
+#include "HammingCode.cpp"
 
 const double max_qber = 6.5e-2;
 
