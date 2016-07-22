@@ -37,15 +37,34 @@ using namespace std;
         {
             DMAFrame(char *buf)
             {
-                p = (unsigned int *)buf;
-                count = p[0] & 0xFFFF;
+                p = (word *)buf;
+                count = p[0].count;
             };
             unsigned short int count;
             //Возвращает базисное состояние с позиции bs_at в пределах данного фрейма
-            uint8_t bs_at(unsigned int pos) {return (p[pos/8] >> ((pos%8)*2)) & 0b11;};
+            uint8_t bs_at(unsigned int pos) {return (p[pos/8].bs >> ((pos % 8) * 2)) & 0b11;};
+            
+            //Возвращает ансамбль временных отсчётов, в которых было детектирование.
+            //Отсчёты, попавшие в калибровочное окно, в выходной ансамбль не попадают.
+            detections detects();
         private:
-            unsigned int *p;
+            union word
+            {
+                struct {
+                    unsigned int bs : 16;
+                    unsigned int calib : 8;
+                    unsigned int detect : 8;
+                };
+
+                struct {
+                    //Порядковый номер врейма - определяется платой
+                    unsigned int count : 16;
+                    //Метка, которая всегда должна быть в нулевом слове каждого фрейма
+                    unsigned int ABCD : 16;
+                };
+            } *p;
         } *curr_frame;
+
         bool curr_frame_initialized = false;
     public:
         //Структура для обработки исключений
@@ -68,6 +87,9 @@ using namespace std;
 
         //Возвращает базисные состояния на позициях count, начиная с нулевого отсчёта нулевого фрейма. Калибровки и метки ABCD не учитываются
         detections get_detect(vector<unsigned int> count);
+        
+        //Возвращает ансамбль временных отсчётов, в которых был детектирован фотон. Детектирования, попавшие в период калибровки не учитываются и в выходной ансамбль не попадают. Накопление ведётся t миллисекунд.
+        detections detects(double t);
 
         //Записывает таблицу случайных чисел из вектора
         void TableRNG(vector<int> table);
@@ -171,6 +193,7 @@ using namespace std;
 
     detections board_if::get_detect(vector<unsigned int> count)
     {
+        //TODO: Переделать, т.к. нумерация count не абсолютная, а относительная - число временных отсчётов между соседними детектированиями (см. detections) 
         detections answer;
 
         for (auto i : count)
@@ -181,6 +204,7 @@ using namespace std;
                 char *buf;
                 if (!top->DMARead(buf)) throw except(top->LastError());
                 curr_frame = new DMAFrame(buf);
+                curr_frame_initialized = true;
             }
 
             if (curr_frame->count == i / (AnBBufferMinSize*2))
@@ -195,6 +219,26 @@ using namespace std;
 
         return answer;
     };
+
+    detections board_if::detects(double t)
+    {
+        detections answer;
+
+        clock_t finish = clock() + t*CLOCKS_PER_SEC;
+        while (clock() < finish)
+        {
+            if (curr_frame_initialized) delete curr_frame;
+            {
+                char *buf;
+                if (!top->DMARead(buf)) throw except(top->LastError());
+                curr_frame = new DMAFrame(buf);
+                curr_frame_initialized = true;
+            }
+            answer.append(curr_frame->detects());
+        }
+
+        return answer;
+    }
 
     void board_if::TableRNG(const std::vector<int> t)
     {
@@ -330,6 +374,29 @@ using namespace std;
             if (!top->DMARead(buf)) throw except(top->LastError());
             curr_frame = new DMAFrame(buf);
         } while(curr_frame->count != 0);
+    }
+
+    detections board_if::DMAFrame::detects(void)
+    {
+        detections answer;
+        unsigned int sum = 0;//Сумма всех count в answer. Необходимо чтобы переводить абсолютную идексацию 8*word+i в относительную. Также исползуется для создания сшивочного элемента count.back()
+        for (size_t word = 0; word < AnBBufferMinSize/4; word++)
+        {
+            if (p[word].detect)//Если в данном слове есть хоть одно детектирование, то проверим все отдельные отсчёты
+            for (int i = 0; i < 8; i++)
+            if (!((p[word].calib >> i) & 0b1))
+            if ((p[word].detect >> i) & 0b1)
+            {
+                answer.basis.push_back((p[word].bs >> (i*2)) & 0b01);
+                answer.key.push_back((p[word].bs >> (i*2)) & 0b10);
+                answer.count.push_back(8*word + i - sum);
+                sum += 8*word + i;
+            }
+        }
+
+        answer.count.push_back(AnBBufferMinSize*2 - sum);//Добавляем сшивочный элемент
+
+        return answer;
     }
 };
 
