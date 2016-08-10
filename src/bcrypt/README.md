@@ -1,5 +1,3 @@
->>>>>>> qnet/src/bcrypt/
-
 Сборка:
 =======
 make qbcrypt
