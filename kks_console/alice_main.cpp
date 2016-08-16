@@ -19,7 +19,7 @@ int main( int argc, char** argv )
 		NetWork::server bob(port);
 		bob.accept_cli();
 		
-		//Приём отдельного числа
+		//Приём отдельного числа int
 		{
 			cout << "Принятое число: ";
 			int number;
@@ -27,7 +27,7 @@ int main( int argc, char** argv )
 			cout << number << endl;
 		}
 
-		//Приём вектора целых чисел
+		//Приём vector<unsigned int>
 		{
 			cout << "Принятый вектор целых чисел (";
 			vector<unsigned int> v;
@@ -36,6 +36,16 @@ int main( int argc, char** argv )
 			for (auto i : v) cout << i;
 			cout << endl;
 		}		
+
+		//Приём vector<bool>
+		{
+			cout << "Принятый vector<bool>(";
+			vector<bool> v;
+			bob.Recv(v);
+			cout << v.size() << "): ";
+			for (auto i : v) cout << i;
+			cout << endl;
+		}
 	}
 	catch(NetWork::server::except &obj)
 	{

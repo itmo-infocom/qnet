@@ -21,13 +21,13 @@ int main( void )
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
 
-		//Отправка отдельного числа
+		//Отправка отдельного числа int
 		{
 			cout << "Посылаю число 7..." << endl;
 			alice.Send(7);
 		}
 
-		//Отправка вектора целых чисел
+		//Отправка vector<unsigned int>
 		{
 			cout << "Отправляю вектор целых чисел(";
 			vector<unsigned int> v(6);
@@ -39,6 +39,20 @@ int main( void )
 			}
 			cout << endl; 
 			alice.Send(v);
+		}
+
+		//Отправка vector<bool>
+		{
+			cout << "Отправка vector<bool>(";
+			vector<bool> v(16);
+			cout << v.size() << "): ";
+			for (int i = 0; i < v.size(); i++) 
+			{
+				v[i] = i & 0b1;
+				cout << (i & 0b1);
+			}
+			alice.Send(v);
+			cout << endl;
 		}
 	}
 	catch(NetWork::client::except &obj)

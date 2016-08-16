@@ -79,14 +79,11 @@ namespace NetWork
 			size_t bytes = v.size()/8 + ((v.size()%8)?1:0); 
 			//v.resize(bytes*8, false);
 					
-			unsigned char *package = new unsigned char [bytes];
-			for (size_t i = 0; i < bytes; i++) package[i] = 0;
+			vector<unsigned char> package(bytes,0);
 			for (size_t i = 0; i < v.size(); i++)
 				package[i/8] |= (v[i] & 0b1) << (i%8);
 
-			if (send(fd, (void*)package, bytes, MSG_WAITALL) == -1) throw except("Send vector<bool>");
-			
-			delete package;
+			if (send(fd, &package[0], bytes, MSG_WAITALL) == -1) throw except("Send vector<bool>");
 		};
 		void send_recv::Recv(std::vector<bool> &v)
 		{
@@ -96,13 +93,11 @@ namespace NetWork
 
 			size_t bytes = size/8 + ((size%8)?1:0);
 
-			unsigned char *package;
-			if (recv(fd, (void*)package, bytes, MSG_WAITALL) == -1) throw except("Recv vector<bool>");
+			vector<unsigned char> package(bytes);
+			if (recv(fd, &package[0], bytes, MSG_WAITALL) == -1) throw except("Recv vector<bool>");
 			
 			for (size_t i = 0; i < (size_t)size; i++)
 			v.push_back(package[i/8] & (0b1 << (i%8)));
-
-			delete package;
 		};
 
 		void send_recv::Send(vector<unsigned int> &v)
