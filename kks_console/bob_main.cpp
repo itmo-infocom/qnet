@@ -20,10 +20,12 @@ int main( void )
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
+		cout << "Посылаю число 7..." << endl;
+		alice.Send(7);
 	}
 	catch(NetWork::client::except &obj)
 	{
-		cerr << obj.errstr << endl;
+		cerr << obj.errstr << ' ' << errno << ' ' << endl;
 		return EXIT_FAILURE;
 	}	
 }//end main()

@@ -18,10 +18,14 @@ int main( int argc, char** argv )
 		char port[] = "50000";
 		NetWork::server bob(port);
 		bob.accept_cli();
+		cout << "Принятое число: ";
+		int number;
+		bob.Recv(number);
+		cout << number << endl;
 	}
 	catch(NetWork::server::except &obj)
 	{
-		cerr << obj.errstr << endl;
+		cerr << obj.errstr << ' ' << errno << ' ' << endl;
 		return EXIT_FAILURE;
 	}
 }

@@ -179,7 +179,7 @@ namespace NetWork
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_flags |= AI_PASSIVE + flag;
+		hints.ai_flags = AI_PASSIVE + flag;
 		hints.ai_protocol = 0;
 		hints.ai_canonname = NULL;
 		hints.ai_addr = NULL;
@@ -189,8 +189,15 @@ namespace NetWork
 		
 		//Кусок ниже - это копия из мануала. Вся эта канитель только ради использования getaddrinfo
 		{
-			if ( getaddrinfo( NULL, _port, &hints, &res ) != 0 ) 
-			throw except("getaddrinfo");
+			{
+				int loc_errno;
+				if ( (loc_errno = getaddrinfo( NULL, _port, &hints, &res )) != 0 )
+				{
+					string tmp = "getaddrinfo: ";
+					tmp += gai_strerror(loc_errno);
+					throw except(tmp);
+				}
+			}
 			
 			struct addrinfo *rp;//указатель на один из вариантов, к кому подключаться
 			for ( rp = res; rp != NULL; rp = rp->ai_next ) {
@@ -243,9 +250,16 @@ namespace NetWork
 		
 		struct addrinfo *res = nullptr;//Здесь будут все возможные варианты, подходящие под hostname
 
-		if ( getaddrinfo( hostname.c_str(), port.c_str(), &hints, &res ) != 0 )
-			throw except("getaddrinfo");
-		
+		{
+			int loc_errno;
+			if ( (loc_errno = getaddrinfo( hostname.c_str(), port.c_str(), &hints, &res )) != 0 )
+			{
+				string tmp = "getaddrinfo: ";
+				tmp += gai_strerror(loc_errno);
+				throw except(tmp);
+			}
+		}
+
 		struct addrinfo *rp;
 		while(fd == -1)
 		{
