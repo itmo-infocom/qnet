@@ -22,7 +22,7 @@ int main( int argc, char** argv )
 		NetWork::NetWork bob(hostname, port);
 		//bob.Send(NetWork::peers::alice);
 	}
-	catch(NetWork::NetWork::except &obj)
+	catch(NetWork::except &obj)
 	{
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;

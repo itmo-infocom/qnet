@@ -17,39 +17,9 @@
 #include "common_func.cpp"
 #include "detections.cpp"
 
-namespace NetWork
+namespace send_recv
 {
 	using namespace std;
-
-	//В данном пространстве имён определены переменные и типы, необходимые для работы сокета. Работа с ними напрямую не рекоммендуется.
-	namespace details {
-	}
-	
-	//Структура для обработки исключений
-	struct except{
-		std::string errstr;
-		except(string e)//e - имя функции, вобудившей исключение
-		{
-			errstr = e; errstr += ": ";
-			errstr += gai_strerror(errno);
-		}
-	};
-
-	class client
-	{
-	public:
-		client(char *_hostname, char *_port);
-		~client();
-	private:
-		//Файловый дескриптора сокета
-		int fd;
-		string hostname;
-		string port;
-
-		//Процедура выполняющая подключение к hostname через порт port
-		void connection_sequence(void);
-	};
-	static void *acception( void* arg );//Существует в отдельном потоке и принимает входящие подключения - создаётся только для сервера
 
 	enum peers
 	{
@@ -60,12 +30,146 @@ namespace NetWork
 		peers_size
 	};
 
-	class NetWork
+	//Структура для обработки исключений
+	struct except{
+		std::string errstr;
+		except(string e)//e - имя функции, вобудившей исключение
+		{
+			errstr = e; errstr += ": ";
+			errstr += gai_strerror(errno);
+		}
+	};
+
+	//В данном пространстве имён определены переменные и типы, необходимые для работы сокета. Работа с ними напрямую не рекоммендуется.
+	namespace details {
+		class send_recv
+		{
+		public:
+			void Send( int number )
+				{
+					void *pnumber = &number;
+					//TODO: Обновить в памяти поведение при различных ошибках отправки/получения
+					if (send(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv send");
+				};
+			void Recv( int &number ) 
+				{
+					void *pnumber = &number;
+					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv");
+				};
+			
+			//TODO: Скопировать реализации из send_recv, удалив в них выбор между пирами
+			void Send(std::vector<bool> &v);
+			void Recv(std::vector<bool> &v);
+
+			void Send(std::vector<unsigned int> &v);
+			void Recv(std::vector<unsigned int> &v);
+
+			void Send(detections &d);
+			void Recv(detections &d);
+		protected:
+			int fd;
+		};
+
+		void send_recv::Send(std::vector<bool> &v)
+		{
+			Send((int)v.size());//Сообщили получателю из скольких элементов состоит массив
+			
+			if (v.size() == 0) return;
+			
+			size_t bytes = v.size()/8 + ((v.size()%8)?1:0); 
+			//v.resize(bytes*8, false);
+					
+			unsigned char *package = new unsigned char [bytes];
+			for (size_t i = 0; i < bytes; i++) package[i] = 0;
+			for (size_t i = 0; i < v.size(); i++)
+				package[i/8] |= (v[i] & 0b1) << (i%8);
+
+			if (send(fd, (void*)package, bytes, MSG_WAITALL) == -1) throw except("Send vector<bool>");
+			
+			delete package;
+		};
+		void send_recv::Recv(std::vector<bool> &v)
+		{
+			int size;
+			Recv(size);
+			if (size == 0) return;
+
+			size_t bytes = size/8 + ((size%8)?1:0);
+
+			unsigned char *package = new unsigned char[bytes];
+			if (recv(fd, (void*)package, bytes, MSG_WAITALL) == -1) throw except("Recv vector<bool>");
+			
+			for (size_t i = 0; i < (size_t)size; i++)
+			v.push_back(package[i/8] & (0b1 << (i%8)));
+
+			delete package;
+		};
+
+		void send_recv::Send(vector<unsigned int> &v)
+		{
+			Send((int)v.size());
+
+			if (v.size() == 0) return;
+			
+			void *ptr = &v[0];
+			if (send(fd, (void*)&v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
+				throw except("Send vector<unsigned int>");
+		}
+		void send_recv::Recv(vector<unsigned int> &v)
+		{
+			int size;
+			Recv(size);
+
+			if (v.size() == 0) return;
+
+			v.resize(size);
+			void *ptr = &v[0];
+			if (recv(fd, (void*)&v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
+				throw except("Recv vector<unsigned int>");
+		}
+
+		void send_recv::Send(detections &d, peers p)
+		{
+			Send(d.basis, p);
+			Send(d.key, p);
+			Send(d.special, p);
+			Send(d.count, p);
+		};
+		void send_recv::Recv(detections &d, peers p)
+		{
+			Recv(d.basis, p);
+			Recv(d.key, p);
+			Recv(d.special, p);
+			Recv(d.count, p);
+		};
+	}
+
+	class client: public details::send_recv
 	{
 	public:
-		NetWork( int _max_cli, char *_port );//Сервер
-		NetWork( char *_hostname, char *_port );//Клиент
-		~NetWork();
+		client(char *_hostname, char *_port);
+		~client();
+	private:
+		//Файловый дескриптора сокета
+		string hostname;
+		string port;
+
+		//Процедура выполняющая подключение к hostname через порт port
+		void connection_sequence(void);
+	};
+
+	static void *acception( void* arg );//Существует в отдельном потоке и принимает входящие подключения - создаётся только для сервера
+	class server: public details::send_recv
+	{
+		server(char *port);
+	};
+
+	class send_recv
+	{
+	public:
+		send_recv( int _max_cli, char *_port );//Сервер
+		send_recv( char *_hostname, char *_port );//Клиент
+		~send_recv();
 		
 		void Send( int cmd, peers p = peers_size )
 			{
@@ -118,7 +222,7 @@ namespace NetWork
 			int fd;
 			if (p < peers_size) fd = clients[p];
 			while (true)
-			if (send(fd, cmd, size, MSG_WAITALL) == -1) throw except("NetWork send");
+			if (send(fd, cmd, size, MSG_WAITALL) == -1) throw except("send_recv send");
 			else break;
 		};
 
@@ -131,7 +235,7 @@ namespace NetWork
 				if (recv( fd, cmd, size, MSG_WAITALL ) != -1) break;
 					else {
 						if (server) sleep(1);
-						else NetWork(hostname, port);
+						else send_recv(hostname, port);
 					}
 		};
 	};
@@ -139,7 +243,7 @@ namespace NetWork
 	//Поток, который устанавливает входящие подключения
 	static void* acception( void* arg )
 	{
-		NetWork *obj = (NetWork*)arg;
+		send_recv *obj = (send_recv*)arg;
 			while (true)
 			{
 				int client = accept( obj->fd, NULL, NULL );
@@ -155,7 +259,7 @@ namespace NetWork
 		return 0;
 	}
 
-	NetWork::NetWork( int _max_cli, char* _port )
+	send_recv::send_recv( int _max_cli, char* _port )
 	{ 
 		max_cli = _max_cli;
 		server = true;
@@ -210,6 +314,8 @@ namespace NetWork
 
 	void client::connection_sequence(void)
 	{
+		close(fd);
+
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
@@ -245,7 +351,7 @@ namespace NetWork
 		freeaddrinfo(res);
 	}
 
-	NetWork::~NetWork()
+	send_recv::~send_recv()
 	{
 		pthread_cancel(thread_acception);
 		pthread_mutex_destroy(&mtx_cli_list);
@@ -253,74 +359,9 @@ namespace NetWork
 		delete cli_types;
 	};
 
-	void NetWork::Send(std::vector<bool> &v, peers p)
-	{
-		Send((int)v.size(), p);//Сообщили получателю из скольких элементов состоит массив
-		
-		if (v.size() == 0) return;
-		
-		size_t bytes = v.size()/8 + ((v.size()%8)?1:0); 
-		//v.resize(bytes*8, false);
-				
-		unsigned char *package = new unsigned char [bytes];
-		for (size_t i = 0; i < bytes; i++) package[i] = 0;
-		for (size_t i = 0; i < v.size(); i++)
- 			package[i/8] |= (v[i] & 0b1) << (i%8);
+	
 
-		Send((void*)package, bytes, p);
-	};
-	void NetWork::Recv(std::vector<bool> &v, peers p)
-	{
-		int size;
-		Recv(size, p);
-		if (size == 0) return;
-
-		size_t bytes = size/8 + ((size%8)?1:0);
-		void *r;
-		Recv(r, bytes, p);
-
-		unsigned char *package = (unsigned char*)r;
-		for (size_t i = 0; i < (size_t)size; i++)
-		v.push_back(package[i/8] & (0b1 << (i%8)));
-	};
-
-	void NetWork::Send(vector<unsigned int> &v, peers p)
-	{
-		Send((int)v.size(), p);
-
-		if (v.size() == 0) return;
-		
-		void *ptr = &v[0];
-		PrivateSend(p, ptr, v.size()*sizeof(v.front()));
-	}
-	void NetWork::Recv(vector<unsigned int> &v, peers p)
-	{
-		int size;
-		Recv(size, p);
-
-		if (v.size() == 0) return;
-
-		v.resize(size);
-		void *ptr = &v[0];
-		PrivateRecv(p, ptr, v.size()*sizeof(v.front()));
-	}
-
-	void NetWork::Send(detections &d, peers p)
-	{
-		Send(d.basis, p);
-		Send(d.key, p);
-		Send(d.special, p);
-		Send(d.count, p);
-	};
-	void NetWork::Recv(detections &d, peers p)
-	{
-		Recv(d.basis, p);
-		Recv(d.key, p);
-		Recv(d.special, p);
-		Recv(d.count, p);
-	};
-
-	bool NetWork::IsReady(int p)
+	bool send_recv::IsReady(int p)
 	{
 		pthread_mutex_lock(&mtx_cli_list);
 			if (p < peers::peers_size) return clients[p] == -1;
