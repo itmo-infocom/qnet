@@ -20,8 +20,26 @@ int main( void )
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
-		cout << "Посылаю число 7..." << endl;
-		alice.Send(7);
+
+		//Отправка отдельного числа
+		{
+			cout << "Посылаю число 7..." << endl;
+			alice.Send(7);
+		}
+
+		//Отправка вектора целых чисел
+		{
+			cout << "Отправляю вектор целых чисел(";
+			vector<unsigned int> v(6);
+			cout << (int)v.size() << "): ";
+			for (int i = 0; i < v.size(); i++) 
+			{
+				v[i] = i;
+				cout << i;
+			}
+			cout << endl; 
+			alice.Send(v);
+		}
 	}
 	catch(NetWork::client::except &obj)
 	{

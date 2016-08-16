@@ -18,10 +18,24 @@ int main( int argc, char** argv )
 		char port[] = "50000";
 		NetWork::server bob(port);
 		bob.accept_cli();
-		cout << "Принятое число: ";
-		int number;
-		bob.Recv(number);
-		cout << number << endl;
+		
+		//Приём отдельного числа
+		{
+			cout << "Принятое число: ";
+			int number;
+			bob.Recv(number);
+			cout << number << endl;
+		}
+
+		//Приём вектора целых чисел
+		{
+			cout << "Принятый вектор целых чисел (";
+			vector<unsigned int> v;
+			bob.Recv(v);
+			cout << v.size() << "): ";
+			for (auto i : v) cout << i;
+			cout << endl;
+		}		
 	}
 	catch(NetWork::server::except &obj)
 	{

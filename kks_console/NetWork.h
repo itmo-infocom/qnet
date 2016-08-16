@@ -39,12 +39,12 @@ namespace NetWork
 				{
 					void *pnumber = &number;
 					//TODO: Обновить в памяти поведение при различных ошибках отправки/получения
-					if (send(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv send");
+					if (send(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv send int");
 				};
 			void Recv( int &number ) 
 				{
 					void *pnumber = &number;
-					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv");
+					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv int`");
 				};
 			
 			//TODO: Скопировать реализации из send_recv, удалив в них выбор между пирами
@@ -111,8 +111,7 @@ namespace NetWork
 
 			if (v.size() == 0) return;
 			
-			void *ptr = &v[0];
-			if (send(fd, (void*)&v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
+			if (send(fd, &v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
 				throw except("Send vector<unsigned int>");
 		}
 		void send_recv::Recv(vector<unsigned int> &v)
@@ -120,11 +119,11 @@ namespace NetWork
 			int size;
 			Recv(size);
 
-			if (v.size() == 0) return;
+			if (size == 0) return;
 
 			v.resize(size);
-			void *ptr = &v[0];
-			if (recv(fd, (void*)&v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
+
+			if (recv(fd, &v[0], v.size()*sizeof(v.front()), MSG_WAITALL) == -1)
 				throw except("Recv vector<unsigned int>");
 		}
 
