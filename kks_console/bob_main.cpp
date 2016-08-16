@@ -18,7 +18,7 @@
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
-	void generation_key(board_if::board_if &brd);//TODO: добавить ссылку на сокет
+	regimes generation_key(board_if::board_if &brd, NetWork::client &alice);//TODO: добавить ссылку на сокет
 //---------------------------------------
 //Точка входа
 int main( int argc, char** argv )
@@ -26,11 +26,14 @@ int main( int argc, char** argv )
 	using namespace std;
 	try{
 		board_if::board_if brd;
-		generation_key(brd);
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
-
+		regimes curr_regime = gen_key;
+		switch (curr_regime)
+		{
+		default: curr_regime = generation_key(brd, alice);
+		}
 	}
 	catch(NetWork::client::except &obj)
 	{
@@ -47,11 +50,12 @@ int main( int argc, char** argv )
 //--------------------------------------------------
 //Определения функций Боба
 
-void generation_key(board_if::board_if &brd)
+regimes generation_key(board_if::board_if &brd, NetWork::client &alice)
 {
 	using namespace std;
 	
-	brd.SetDMA(false);//TODO: В документации упомянуть, что нельзя работать с регистрами одновременно с работой DMA
+	//TODO: В документации упомянуть, что нельзя работать с регистрами одновременно с работой DMA
+	brd.SetDMA(false);
 
 	//Запись full-rnd в TableRNG
 	{
@@ -65,23 +69,25 @@ void generation_key(board_if::board_if &brd)
 	brd.SetBufSize(2*collect_time);
 	brd.SetDMA(true);
 	brd.clear_buf();//Удаление всех фреймов, пока не встретим с номером ноль
+
+	regimes curr_regime = regimes::gen_key;	
 	
-	//while (curr_regime == regimes::gen_key)
+	while (curr_regime == regimes::gen_key)
 	{
 		detections my_detect = brd.detects(collect_time);//Будем собирать детектирования в течение одной секунды
-		//alice.send(my_detect);
+		alice.Send(my_detect);
 		detections alice_detect;
-		//alice.recv(alice_detect);
+		alice.Recv(alice_detect);
 
 		vector<bool> key = sift_key(my_detect, alice_detect);
 
 		//Вычисление qber
 		{
 			unsigned int seed_qber;
-			//alice.recv(seed_qber);
+			alice.Recv(seed_qber);
 			vector<bool> qber_key = get_qber_key(key, seed_qber);
 			vector<bool> alice_qber_key;
-			//alice.recv(alice_qber_key);
+			alice.Recv(alice_qber_key);
 			size_t mismatch = 0;//Число несовпадающих бит
 			for (size_t i = 0; i < qber_key.size(); i++)
 			if (qber_key[i] != alice_qber_key[i]) mismatch++;
@@ -89,13 +95,13 @@ void generation_key(board_if::board_if &brd)
 			if ((double)mismatch/qber_key.size() > max_qber)
 			{
 				errors errcode = errors::qber;
-				//alice.send(errcode);
+				alice.Send(errcode);
 				throw errcode;
 			}
 		}
 
 		//Формируем код Хэмминга и отправляем его Алисе
-		//alice.send(HammingCode(key));
+		alice.Send(HammingCode(key));
 
 		//Сформируем команду для отправки curl-запроса потребителю.
 		//Ключ передаётся в шестнадцатеричном виде в видe ascii-текста
@@ -115,8 +121,9 @@ void generation_key(board_if::board_if &brd)
 			cmd += ss.str();
 			cmd += ' ' + URL;
 			system(cmd.c_str());
-		} 
+		}
 	}
 
 	brd.SetDMA(false);
+	return curr_regime;
 }

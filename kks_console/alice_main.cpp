@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-//#include "board_if.h"
+#include "board_if.h"
 #include "NetWork.h"
 #include "detections.cpp"
 
@@ -15,7 +15,7 @@
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
-	void generation_key(board_if::board_if &brd);//TODO: добавить ссылку на сокет
+	regimes generation_key(board_if::board_if &brd, NetWork::server &bob);//TODO: добавить ссылку на сокет
 
 //---------------------------------------
 //Точка входа
@@ -26,10 +26,13 @@ int main( int argc, char** argv )
 		char port[] = "50000";
 		NetWork::server bob(port);
 		bob.accept_cli();
-		
-	}
 		board_if::board_if brd;
-		generation_key(brd);
+
+		regimes curr_regime = gen_key;
+		switch (curr_regime)
+		{
+		default: curr_regime = generation_key(brd, bob);
+		}
 	}
 	catch(NetWork::server::except &obj)
 	{
@@ -43,11 +46,12 @@ int main( int argc, char** argv )
 	}
 }
 
-void generation(board_if::board_if &brd)
+void generation(board_if::board_if &brd, NetWork::server &bob)
 {
 	using namespace std;
 	
-	brd.SetDMA(false);//TODO: В документации упомянуть, что нельзя работать с регистрами одновременно с работой DMA
+	//TODO: В документации упомянуть, что нельзя работать с регистрами одновременно с работой DMA
+	brd.SetDMA(false);
 
 	//Запись full-rnd в TableRNG
 	{
@@ -62,11 +66,17 @@ void generation(board_if::board_if &brd)
 	brd.SetDMA(true);
 	brd.clear_buf();
 	
-	//while (bob.regime() == regimes::gen_key)
+	regimes curr_regime;
+	{
+		int tmp;
+		bob.Recv(tmp);
+		curr_regime = (regimes)tmp;
+	}
+	while (curr_regime == regimes::gen_key)
 	{
 		//Принимаем detections от боба
 		detections bob_detect;
-		//bob.recv(bob_detect);
+		bob.Recv(bob_detect);
 
 		//Вытащим нужные отсчеты из своего DMA
 		detections my_detect = brd.get_detect(bob_detect.count);
@@ -75,7 +85,7 @@ void generation(board_if::board_if &brd)
 		{
 			detections to_send = my_detect;
 			to_send.key.clear(); 
-			//bob.send(to_send);
+			bob.Send(to_send);
 		} 
 
 		vector<bool> key = sift_key(my_detect, bob_detect);
@@ -83,18 +93,22 @@ void generation(board_if::board_if &brd)
 		unsigned int seed_qber;
 		vector<bool> qber_key = get_qber_key(key, seed_qber);
 		
-		//bob.send(seed_qber);
-		//bob.send(qber_key);
+		bob.Send(seed_qber);
+		bob.Send(qber_key);
 
 		//Принимаем от боба код ошибки.
-		errors errcode; 
-		//bob.recv(errcode)
+		errors errcode;
+		{
+			int tmp;
+			bob.Recv(tmp);
+			errcode = (errors)tmp;
+		}
 		if (errcode == errors::qber) throw errcode;
 
 		//Примем код Хэмминга
 		vector<bool> ham_code;
-		//bob.recv(ham_code);
-		//key = HamDecode(key, ham_code);
+		bob.Recv(ham_code);
+		key = HammingDecode(key, ham_code);
 
 		//Сформируем команду для отправки curl-запроса потребителю.
 		//Ключ передаётся в шестнадцатеричном виде в видe ascii-текста

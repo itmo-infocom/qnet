@@ -47,14 +47,26 @@ namespace NetWork
 					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv int`");
 				};
 			
+			void Send(unsigned int number)
+			{
+				int tmp = number;
+				Send(tmp);
+			}
+			void Recv(unsigned int &number)
+			{
+				int tmp;
+				Recv(tmp);
+				number = tmp;
+			}
+			
 			//TODO: Скопировать реализации из send_recv, удалив в них выбор между пирами
-			void Send(std::vector<bool> &v);
+			void Send(std::vector<bool> v);
 			void Recv(std::vector<bool> &v);
 
-			void Send(std::vector<unsigned int> &v);
+			void Send(std::vector<unsigned int> v);
 			void Recv(std::vector<unsigned int> &v);
 
-			void Send(detections &d);
+			void Send(detections d);
 			void Recv(detections &d);
 
 			//Структура для обработки исключений
@@ -70,7 +82,7 @@ namespace NetWork
 			int fd;
 		};
 
-		void send_recv::Send(std::vector<bool> &v)
+		void send_recv::Send(std::vector<bool> v)
 		{
 			Send((int)v.size());//Сообщили получателю из скольких элементов состоит массив
 			
@@ -100,7 +112,7 @@ namespace NetWork
 			v.push_back(package[i/8] & (0b1 << (i%8)));
 		};
 
-		void send_recv::Send(vector<unsigned int> &v)
+		void send_recv::Send(vector<unsigned int> v)
 		{
 			Send((int)v.size());
 
@@ -122,7 +134,7 @@ namespace NetWork
 				throw except("Recv vector<unsigned int>");
 		}
 
-		void send_recv::Send(detections &d)
+		void send_recv::Send(detections d)
 		{
 			Send(d.basis);
 			Send(d.key);
