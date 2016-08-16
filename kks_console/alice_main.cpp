@@ -10,19 +10,16 @@
 #include "detections.cpp"
 
 //---------------------------------------
-
-//---------------------------------------
 //Точка входа
 int main( int argc, char** argv )
 {
 	using namespace std;
 	try{
-		char hostname[] = "localhost4";
 		char port[] = "50000";
-		NetWork::NetWork bob(hostname, port);
-		//bob.Send(NetWork::peers::alice);
+		NetWork::server bob(port);
+		bob.accept_cli();
 	}
-	catch(NetWork::except &obj)
+	catch(NetWork::server::except &obj)
 	{
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;

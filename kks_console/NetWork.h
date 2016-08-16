@@ -17,7 +17,7 @@
 #include "common_func.cpp"
 #include "detections.cpp"
 
-namespace send_recv
+namespace NetWork
 {
 	using namespace std;
 
@@ -29,17 +29,7 @@ namespace send_recv
 		
 		peers_size
 	};
-
-	//Структура для обработки исключений
-	struct except{
-		std::string errstr;
-		except(string e)//e - имя функции, вобудившей исключение
-		{
-			errstr = e; errstr += ": ";
-			errstr += gai_strerror(errno);
-		}
-	};
-
+	
 	//В данном пространстве имён определены переменные и типы, необходимые для работы сокета. Работа с ними напрямую не рекоммендуется.
 	namespace details {
 		class send_recv
@@ -66,6 +56,16 @@ namespace send_recv
 
 			void Send(detections &d);
 			void Recv(detections &d);
+
+			//Структура для обработки исключений
+			struct except{
+				std::string errstr;
+				except(string e)//e - имя функции, вобудившей исключение
+				{
+					errstr = e; errstr += ": ";
+					errstr += gai_strerror(errno);
+				}
+			};
 		protected:
 			int fd;
 		};
@@ -96,7 +96,7 @@ namespace send_recv
 
 			size_t bytes = size/8 + ((size%8)?1:0);
 
-			unsigned char *package = new unsigned char[bytes];
+			unsigned char *package;
 			if (recv(fd, (void*)package, bytes, MSG_WAITALL) == -1) throw except("Recv vector<bool>");
 			
 			for (size_t i = 0; i < (size_t)size; i++)
@@ -148,7 +148,7 @@ namespace send_recv
 	{
 	public:
 		client(char *_hostname, char *_port);
-		~client();
+		~client() {close(fd);};
 	private:
 		//Файловый дескриптора сокета
 		string hostname;
@@ -160,12 +160,15 @@ namespace send_recv
 
 	class server: public details::send_recv
 	{
+	public:
 		//Конструктор. flag - для указания работы в неблокирующем (SOCK_NONBLOCK) режиме (чтобы Боб не зависал GUI, который может никогда и не подключиться)
 		server(char *port, int flag = 0);
 
 		//Принимает входящее соединение с флагом flag - в блокирующем или неблокирующем режиме.
 		//Возвращает успешность принятия соединения. 
 		bool accept_cli(void);
+
+		~server() {close(fd); close(socket_fd);}
 	private:
 		//Дескриптор сокета - для клиента используется fd из details::send_recv
 		int socket_fd;

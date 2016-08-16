@@ -12,17 +12,16 @@
 #include "common_func.cpp"
 
 //---------------------------------------
-
-//---------------------------------------
 //Точка входа
 int main( void )
 {
 	using namespace std;
 	try{
+		char hostname[] = "localhost4";
 		char port[] = "50000";
-		NetWork::NetWork server(port);
+		NetWork::client alice(hostname, port);
 	}
-	catch(NetWork::NetWork::except &obj)
+	catch(NetWork::client::except &obj)
 	{
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;
