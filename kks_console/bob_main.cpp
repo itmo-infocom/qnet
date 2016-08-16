@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "board_if.h"
-//#include "NetWork.h"
+#include "NetWork.h"
 #include "detections.cpp"
 
 #include "FFT_CODE/complex.h"
@@ -19,7 +19,6 @@ const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
 	void generation_key(board_if::board_if &brd);//TODO: добавить ссылку на сокет
-
 //---------------------------------------
 //Точка входа
 int main( int argc, char** argv )
@@ -28,13 +27,25 @@ int main( int argc, char** argv )
 	try{
 		board_if::board_if brd;
 		generation_key(brd);
+		char hostname[] = "localhost4";
+		char port[] = "50000";
+		NetWork::client alice(hostname, port);
+
 	}
+	catch(NetWork::client::except &obj)
+	{
+		cerr << obj.errstr << ' ' << errno << ' ' << endl;
+		return EXIT_FAILURE;
+	}	
 	catch(board_if::board_if::except &obj)
 	{
 		cerr << obj.errstr << endl;
 		return EXIT_FAILURE;
 	}
-}
+}//end main()
+
+//--------------------------------------------------
+//Определения функций Боба
 
 void generation_key(board_if::board_if &brd)
 {

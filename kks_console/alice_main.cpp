@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "board_if.h"
-//#include "NetWork.h"
+//#include "board_if.h"
+#include "NetWork.h"
 #include "detections.cpp"
 
 #include "common_func.cpp"
@@ -23,8 +23,18 @@ int main( int argc, char** argv )
 {
 	using namespace std;
 	try{
+		char port[] = "50000";
+		NetWork::server bob(port);
+		bob.accept_cli();
+		
+	}
 		board_if::board_if brd;
 		generation_key(brd);
+	}
+	catch(NetWork::server::except &obj)
+	{
+		cerr << obj.errstr << ' ' << errno << ' ' << endl;
+		return EXIT_FAILURE;
 	}
 	catch(board_if::board_if::except &obj)
 	{
