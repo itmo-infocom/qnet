@@ -19,6 +19,7 @@ const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
 	regimes generation_key(board_if::board_if &brd, NetWork::client &alice);//TODO: добавить ссылку на сокет
+	void test(board_if::board_if &brd, NetWork::client &alice);
 //---------------------------------------
 //Точка входа
 int main( int argc, char** argv )
@@ -29,11 +30,8 @@ int main( int argc, char** argv )
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
-		regimes curr_regime = gen_key;
-		switch (curr_regime)
-		{
-		default: curr_regime = generation_key(brd, alice);
-		}
+		
+		test(brd, alice);
 	}
 	catch(NetWork::client::except &obj)
 	{
@@ -126,4 +124,45 @@ regimes generation_key(board_if::board_if &brd, NetWork::client &alice)
 
 	brd.SetDMA(false);
 	return curr_regime;
+}
+
+void test(board_if::board_if &brd, NetWork::client &alice)
+{
+	//Соберём пырк
+	{
+		//TableRNG с пыпыркой
+		{
+			vector<int> rng(1024,0);
+			rng.back() = 2;
+			brd.TableRNG(rng);
+		}
+
+		brd.SetBufSize(2*collect_time);
+		alice.Send(0);
+		brd.SetDMA(true);
+		brd.clear_buf();//Удаление всех фреймов, пока не встретим с номером ноль
+
+		detections my_detect = brd.detects(collect_time);
+
+		brd.SetDMA(false);
+		//Удалим сшивочный элемент
+		my_detect.count.pop_back();
+
+		//Теперь создадим массив одного с TableRNG размера и запишем в ней набранную статистику
+		{
+			vector<unsigned int> stat(1024,0);
+			unsigned int sum = 0;
+			for (auto i : my_detect.count)
+			{
+				sum += i;
+				stat[sum%1024]++;
+			}
+
+			//Выведем статистику во внешний файл
+			{
+				ofstream f("pyrk", ios::trunc);
+				for (auto i : stat) f << i << endl;
+			}
+		}
+	}
 }

@@ -87,7 +87,7 @@ using namespace std;
 
         //Устанавливает размер буфера, который способен хранить фреймы за время collect_time.
         //collect_time устанавливается в миллисекундах
-        void setBufSize(double collect_time)
+        void SetBufSize(double collect_time)
         {top->SetBuffersCount(collect_time * 1e-3 * frequency / (1<<17));}
     
         //Возвращает базисные состояния на позициях count, начиная с нулевого отсчёта нулевого фрейма. Калибровки и метки ABCD не учитываются
@@ -105,9 +105,6 @@ using namespace std;
 
         //Записывает во внутренную память метода накопленные за t миллисекунд фреймы DMA
         void StoreDMA(double t, int argc, char** argv);
-
-        //Устанавливает размер буфера DMA драйвера в секундах
-        void SetBufSize(float t) {top->SetBuffersCount(t*frequency/(1<<17)+1);};
 
         //Удаляет фреймы DMA, пока не повстречает фрейм с нулевым номером - он будет сохранён в *curr_frame
         void clear_buf(void);

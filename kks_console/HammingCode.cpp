@@ -82,9 +82,9 @@ vector <bool> HammingDecode(vector <bool> key, vector <bool> cbit_storage_input)
                vector <bool> cbit_storage_output;
                
    //Инициализация контрольных бит
-               while (pow(2,i)<key.size())
+               while ((1<<i)<key.size())
                   {
-                     key.insert(key.begin()+pow(2,i)-1,0);
+                     key.insert(key.begin()+(1<<i)-1,0);
                      i++;
                   }
    //Расчет контрольных бит

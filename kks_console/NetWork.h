@@ -38,7 +38,6 @@ namespace NetWork
 			void Send( int number )
 				{
 					void *pnumber = &number;
-					//TODO: Обновить в памяти поведение при различных ошибках отправки/получения
 					if (send(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv send int");
 				};
 			void Recv( int &number ) 
@@ -59,7 +58,6 @@ namespace NetWork
 				number = tmp;
 			}
 			
-			//TODO: Скопировать реализации из send_recv, удалив в них выбор между пирами
 			void Send(std::vector<bool> v);
 			void Recv(std::vector<bool> &v);
 

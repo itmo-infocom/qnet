@@ -16,6 +16,7 @@ const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
 	regimes generation_key(board_if::board_if &brd, NetWork::server &bob);//TODO: добавить ссылку на сокет
+	void test(board_if::board_if &brd, NetWork::server &bob);
 
 //---------------------------------------
 //Точка входа
@@ -28,11 +29,7 @@ int main( int argc, char** argv )
 		bob.accept_cli();
 		board_if::board_if brd;
 
-		regimes curr_regime = gen_key;
-		switch (curr_regime)
-		{
-		default: curr_regime = generation_key(brd, bob);
-		}
+		test(brd, bob);
 	}
 	catch(NetWork::server::except &obj)
 	{
@@ -62,7 +59,7 @@ void generation(board_if::board_if &brd, NetWork::server &bob)
 		brd.TableRNG(tmp);
 	}
 
-	brd.setBufSize(2*collect_time);
+	brd.SetBufSize(2*collect_time);
 	brd.SetDMA(true);
 	brd.clear_buf();
 	
@@ -130,6 +127,24 @@ void generation(board_if::board_if &brd, NetWork::server &bob)
 			system(cmd.c_str());
 		} 
 	}
+
+	brd.SetDMA(false);
+}
+
+void test(board_if::board_if &brd, NetWork::server &bob)
+{
+	//TableRNG в статику
+	{
+		vector<int> rng(1024,0);
+		brd.TableRNG(rng);
+	}
+
+	brd.SetBufSize(2*collect_time);
+	int start;
+	bob.Recv(start);
+	brd.SetDMA(true);
+
+	sleep(1);
 
 	brd.SetDMA(false);
 }
