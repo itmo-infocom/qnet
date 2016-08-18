@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 
 const std::string URL = "http://localhost4/qchannel/1/";
 
@@ -23,20 +24,20 @@ int main (void)
     //Если чисто бит не кратно четырём, то ненужные биты с конца отбрасываем -
     //невелика потеря
     {
-        string cmd = "curl --data ";
+        string cmd = "curl --data-ascii ";
         stringstream ss;
         //Отбросим некратные четырём биты с конца
         key.resize((key.size()/4)*4);
         //Теперь будем формировать по одному hex-символу и добавлять ко строке
         for (size_t i = 0; i < key.size()/4; i++)
         {
-            uint8_t val = 0;
+            int val = 0;
             for (size_t j = 0; j < 4; j++) val |= key[i*4 + j] << j;
-            ss << hex << val;
+            ss << setbase(16) << val;
         }
         cmd += ss.str();
         cmd += ' ' + URL;
-        //system(cmd.c_str());
-        cout << cmd << endl;
+        system(cmd.c_str());
+        //cout << cmd << endl;
     }
 }
