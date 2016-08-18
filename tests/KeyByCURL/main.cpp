@@ -6,7 +6,7 @@
 #include <iostream>
 #include <iomanip>
 
-const std::string URL = "http://localhost4/qchannel/1/";
+const std::string URL = "http://localhost4/qchannel/1/1";
 
 int main (void)
 {
