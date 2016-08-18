@@ -27,6 +27,7 @@ int main( int argc, char** argv )
 		char port[] = "50000";
 		NetWork::server bob(port);
 		bob.accept_cli();
+		
 		board_if::board_if brd;
 
 		test(brd, bob);

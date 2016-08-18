@@ -18,8 +18,14 @@
 const std::string URL = "http://localhost4/qchannel/1/";
 //---------------------------------------
 	//Алгоритм генерации ключа
-	regimes generation_key(board_if::board_if &brd, NetWork::client &alice);//TODO: добавить ссылку на сокет
+	regimes generation_key(board_if::board_if &brd, NetWork::client &alice, NetWork::server &GUI);
+	
+	//Тестовая функция, сохраняющая пырк в текстовом файле
 	void test(board_if::board_if &brd, NetWork::client &alice);
+	
+	//Функция, подстраивающая амплитуды и фазы модуляторов Боба. Возвращает значение статического контраста
+	double static_contrast(board_if::board_if &brd, NetWork::client &alice);
+
 //---------------------------------------
 //Точка входа
 int main( int argc, char** argv )
@@ -30,8 +36,21 @@ int main( int argc, char** argv )
 		char hostname[] = "localhost4";
 		char port[] = "50000";
 		NetWork::client alice(hostname, port);
+		NetWork::server GUI(port, SOCK_NONBLOCK);
+
+		regimes current_regime = regimes::gen_key;
 		
-		test(brd, alice);
+		while(true)
+		{
+			if (GUI.accept_cli()) GUI.Recv(current_regime);
+			
+			switch(current_regime)
+			{
+				case test_pyrk: test(brd, alice); break;
+				default: current_regime = generation_key(brd, alice, GUI);
+			}
+		}
+		//test(brd, alice);
 	}
 	catch(NetWork::client::except &obj)
 	{
@@ -48,7 +67,7 @@ int main( int argc, char** argv )
 //--------------------------------------------------
 //Определения функций Боба
 
-regimes generation_key(board_if::board_if &brd, NetWork::client &alice)
+regimes generation_key(board_if::board_if &brd, NetWork::client &alice, NetWork::server &GUI)
 {
 	using namespace std;
 	
@@ -165,4 +184,9 @@ void test(board_if::board_if &brd, NetWork::client &alice)
 			}
 		}
 	}
+}
+
+double static_contrast(board_if::board_if &brd, NetWork::client &alice)
+{
+	
 }

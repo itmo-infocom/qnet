@@ -17,6 +17,7 @@ const double collect_time = 1e3;
 enum regimes
 {
 	gen_key,
+	test_pyrk,
 
 	regimes_size
 };

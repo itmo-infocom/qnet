@@ -43,7 +43,7 @@ namespace NetWork
 			void Recv( int &number ) 
 				{
 					void *pnumber = &number;
-					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv int`");
+					if (recv(fd, pnumber, sizeof(number), MSG_WAITALL) == -1) throw except("send_recv recv int");
 				};
 			
 			void Send(unsigned int number)
@@ -57,6 +57,14 @@ namespace NetWork
 				Recv(tmp);
 				number = tmp;
 			}
+
+			void Send(regimes r) {Send((int)r);};
+			void Recv(regimes &r)
+			{
+				int number;
+				Recv(number);
+				r = (regimes)number;
+			};
 			
 			void Send(std::vector<bool> v);
 			void Recv(std::vector<bool> &v);
@@ -176,10 +184,14 @@ namespace NetWork
 	private:
 		//Дескриптор сокета - для клиента используется fd из details::send_recv
 		int socket_fd;
+		//Флаг подключённого клиента 
+		bool accepted;
 	};
 
 	server::server(char* _port, int flag)
 	{ 
+		accepted = false;
+
 		struct addrinfo hints;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
@@ -226,11 +238,13 @@ namespace NetWork
 
 	bool server::accept_cli(void)
 	{
-		if ((fd = accept(socket_fd, NULL, NULL)) == -1)
-		{
-			if (errno == EWOULDBLOCK || errno == EAGAIN) return false;
-			else throw except("accept");
-		} else return true;
+		if (!accepted)
+			if ((fd = accept(socket_fd, NULL, NULL)) == -1)
+			{
+				if (errno == EWOULDBLOCK || errno == EAGAIN) return false;
+				else throw except("accept");
+			} else {accepted = true; return true;}
+		else return true;
 	};
 	
 	client::client(char *_hostname, char *_port)
