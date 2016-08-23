@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include <libconfig.h>
+
 #define MAXEVENTS 64
 
 #define BUF_SIZE 1024
@@ -30,10 +32,85 @@ int reread = 0;
 int toclose = 0;
 char *arg1;
 char *arg2;
+int mode;
+int coder = 0;
+char port[50];
+char portDest[50];
+char portCtrl[50];
+char *ip;
 
 struct key *keys = NULL;
 
 struct key *curkey;
+
+void read_cfg(char *fname){
+	config_t cfg;
+	config_setting_t *root;	
+
+	config_init(&cfg);
+	
+	if(!config_read_file(&cfg, (fname==NULL?"config.cfg":fname)))
+	{
+	    fprintf(stderr, "%s:%d - %s\n", config_error_file(&cfg),
+		    config_error_line(&cfg), config_error_text(&cfg));
+	    config_destroy(&cfg);
+	    return(EXIT_FAILURE);
+	}
+	
+  	root = config_root_setting(&cfg);
+
+	if(config_lookup_int(&cfg, "mode", &mode))
+	    printf("Mode: %d\n\n", mode);
+	  else
+	    fprintf(stderr, "No 'mode' setting in configuration file.\n");
+
+	if(config_lookup_int(&cfg, "coder", &coder))
+	    printf("Coder: %d\n\n", coder);
+	  else
+	    fprintf(stderr, "No 'coder' setting in configuration file.\n");
+	int tmp = 0;
+	if(config_lookup_int(&cfg, "port", &tmp)){
+	    printf("port: %d\n\n", tmp);
+    	    sprintf( port, "%d", tmp );  
+	  }else
+	    fprintf(stderr, "No 'port' setting in configuration file.\n");
+
+	if(config_lookup_int(&cfg, "portDest", &tmp)){
+	    printf("portDest: %d\n\n", tmp);
+    	    sprintf( portDest, "%d", tmp );  
+	  }else
+	    fprintf(stderr, "No 'portDest' setting in configuration file.\n");
+
+	if(config_lookup_int(&cfg, "portCtrl", &tmp)){
+	    printf("portCtrl: %d\n\n", tmp);
+    	    sprintf( portCtrl, "%d", tmp );  
+	  }else
+	    fprintf(stderr, "No 'portCtrl' setting in configuration file.\n");
+
+	if(config_lookup_string(&cfg, "ip", &ip))
+	    printf("ip: %s\n\n", ip);
+	  else
+	    fprintf(stderr, "No 'ip' setting in configuration file.\n");
+
+        if(mode == 1){
+		if(config_lookup_string(&cfg, "keyDir", &arg1))
+		    printf("keyDir: %s\n\n", arg1);
+		  else
+		    fprintf(stderr, "No 'keyDir' setting in configuration file.\n");
+
+		if(config_lookup_string(&cfg, "keyTail", &arg2))
+		    printf("keyTail: %s\n\n", arg2);
+		  else
+		    fprintf(stderr, "No 'keyTail' setting in configuration file.\n");
+	}else if(mode == 2){
+		if(config_lookup_string(&cfg, "keyFile", &arg1))
+		    printf("keyFile: %s\n\n", arg1);
+		  else
+		    fprintf(stderr, "No 'keyFile' setting in configuration file.\n");		
+	}
+
+  	config_destroy(&cfg);
+}
 
 struct key *get_key(char *file) {
     FILE *f;
@@ -103,10 +180,138 @@ int get_files(char *dir_name, char *tail) {
     return (cnt);
 }
 
+struct key *get_key_buffer(char *f, int size) {
+    size_t res;
+    struct key *key, *k;
+
+    if (f == NULL) return (NULL);
+
+    key = malloc(sizeof (struct key));
+    if (key == NULL) return (NULL);
+    key->curpos = 0;
+    memcpy(key->num, f, 8);
+    //res = read(f, key->num, 8);
+    memcpy(key->key, f, size);
+        key->size = size;
+        if (keys == NULL) {
+            keys = key;
+        } else {
+            k = keys;
+            while (k->next != keys) {
+                k = k->next;
+            }
+            k->next = key;
+        }
+        // Circular list
+        key->next = keys;
+    return (key);
+}
+
+int get_keys_buffer(char *f, int size) {
+    int cnt = 0;
+    int all = 0; 
+    struct key *key;
+
+    if(size<16){
+	return 0;
+    }
+    if (keys != NULL) {
+        free(keys);
+        keys = NULL;
+    }
+    key = get_key_buffer(f,size>BUF_SIZE?BUF_SIZE:size);
+    while(key!=NULL){
+		print_key(key);
+        	cnt++;
+		all+=key->size;
+		if(all>=size-16){
+			return (cnt);
+		}
+    		key = get_key_buffer(f,(size-all>BUF_SIZE?BUF_SIZE:size-all));
+    }
+    return (cnt);
+}
+
+struct key *key_alloc()
+{
+  struct key *key, *k;
+
+  key = malloc(sizeof(struct key));
+  if (key == NULL) return(key);
+
+  if(keys!=NULL) {
+    // Find last key in chain
+    k = keys;
+    while(k->next != keys) {
+      //fprintf(stderr, "key->next=0x%x\n", k->next);
+      k=k->next;
+    }
+    k->next = key;
+  } else keys = key;
+
+  key->size = 0;
+  // Circular list
+  key->next = keys;
+
+  return(key);
+}
+
+int get_key_plug(char *file)
+{
+  char in[BUF_SIZE];
+  FILE *f;
+  size_t res=0;
+  int bit, byte=0, num=0, bcnt=0, cnt=0, ret=0, tmp;
+  int i;
+  int allkeys=0;
+  struct key *key, *k;
+
+    if (keys != NULL) {
+        free(keys);
+        keys = NULL;
+    }
+
+  fprintf(stderr, "file=%s\n", file);
+  f = fopen(file, "r");
+  if (f == NULL) return(0);
+
+  key = key_alloc();
+  if (key == NULL) return(0);
+  key->curpos = 0;
+  while(fgets(in, BUF_SIZE, f) != NULL) {
+    ret = sscanf(in, "%d       %d", &bit, &tmp);
+    if (ret) {
+      if (bcnt < 8) {
+	byte |= bit << bcnt; bcnt++;
+      }
+      else {
+	// Next byte
+	key->key[cnt] = byte;
+	key->size = cnt++;
+	bcnt = 0;
+	byte = bit;
+	// Next key
+	if (cnt > BUF_SIZE) {
+	  res += cnt;
+  	  memcpy(key->num,key->key,8);
+          key->curpos = 0;
+	  cnt = 0;
+	  print_key(key);
+	  allkeys++;
+	  key = key_alloc();
+	  if (key == NULL) return(0);
+	}
+      }
+    }
+  }
+  res += cnt;
+  return allkeys;
+}
+
 void print_key(struct key * key) {
     int i;
 
-    fprintf(stdout, "%d ", key->size + 8);
+    fprintf(stdout, "%d ", key->size);
     for (i = 0; i < 8; i++)
         fprintf(stdout, "%x ", key->num[i]);
     fprintf(stdout, "%d", key->curpos);
@@ -117,6 +322,7 @@ size_t crypt(char *data, int length, int socket) {
     char out[BUF_SIZE];
     size_t readsize;
     int count = 0;
+    int i; 
     
     while (count < length) {
         if (toclose) {
@@ -125,7 +331,16 @@ size_t crypt(char *data, int length, int socket) {
             if (reread || curkey == NULL) {
                 fprintf(stdout, "REREAD KEYS\n");
                 reread = 0;
-                get_files(arg1, arg2);
+    		if(mode == 1){
+            		get_files(arg1, arg2);
+		}else if(mode == 2){
+	    		get_key_plug(arg1);
+		}else{
+			if(keys==NULL){				
+  				fprintf(stderr, "NO KEYS\n");
+				return 0;
+			}
+		}
                 curkey = keys;
             }
         }
@@ -138,8 +353,8 @@ size_t crypt(char *data, int length, int socket) {
             curkey->curpos = 0;
         }
 
-        for (int i = count; i < readsize + count; i++) {
-            out[i - count] = data[i] ^ curkey->key[i + curkey->curpos];
+        for (i = count; i < readsize + count; i++) {
+            out[i - count] = data[i] ^ curkey->key[i + curkey->curpos - count];
         }
         write(socket, curkey->num, 8);
         write(socket, &(curkey->curpos), sizeof (int));
@@ -155,6 +370,7 @@ int read_block(int stream, char *arr, int size, int toret) {
     int ready = 0;
     int nbytes;
     char ar[BLOCK_SIZE];
+    int i;
     while (ready < size) {
         nbytes = read(stream, ar, size - ready);
         if (nbytes == -1) {
@@ -169,7 +385,7 @@ int read_block(int stream, char *arr, int size, int toret) {
             return 0;
         } else //new data was delivered
         {
-            for (int i = ready; i < nbytes + ready; i++) {
+            for (i = ready; i < nbytes + ready; i++) {
                 arr[i] = ar[i - ready];
             }
             ready += nbytes;
@@ -206,12 +422,19 @@ size_t decrypt(int inpsocket, int outsocket) {
             }
         }
         if (flagToReload == 1) {
-            get_files(arg1, arg2);
+    		if(mode == 1){
+            		get_files(arg1, arg2);
+		}else if(mode == 2){
+	    		get_key_plug(arg1);
+		}else{
+			
+		}
         }
     }
     read_block(inpsocket, &(curkey->curpos), sizeof (int), 0);
     read_block(inpsocket, &(size), sizeof (int), 0);
     read_block(inpsocket, in, size, 0);
+
     
     for (i = 0; i < size; i++) {
         out[i] = in[i] ^ curkey->key[i + curkey->curpos];
@@ -221,8 +444,7 @@ size_t decrypt(int inpsocket, int outsocket) {
     return (size);
 }
 
-static int
-make_socket_non_blocking(int sfd) {
+static int make_socket_non_blocking(int sfd) {
     int flags, s;
 
     flags = fcntl(sfd, F_GETFL, 0);
@@ -241,18 +463,17 @@ make_socket_non_blocking(int sfd) {
     return 0;
 }
 
-static int
-create_and_bind(char *port) {
+static int create_and_bind(char *portInp) {
     struct addrinfo hints;
     struct addrinfo *result, *rp;
-    int s, sfd;
+    int s, sfd; 
 
     memset(&hints, 0, sizeof (struct addrinfo));
     hints.ai_family = AF_UNSPEC; /* Return IPv4 and IPv6 choices */
     hints.ai_socktype = SOCK_STREAM; /* We want a TCP socket */
     hints.ai_flags = AI_PASSIVE; /* All interfaces */
 
-    s = getaddrinfo(NULL, port, &hints, &result);
+    s = getaddrinfo(NULL, portInp, &hints, &result);
     if (s != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
         return -1;
@@ -282,7 +503,6 @@ create_and_bind(char *port) {
     return sfd;
 }
 
-int coder = 0;
 
 int
 main(int argc, char *argv[]) {
@@ -293,39 +513,51 @@ main(int argc, char *argv[]) {
     struct epoll_event *events;
     int result;
 
-    if (argc != 8) {
-        fprintf(stderr, "Usage: %s [port] [connectip] [connectport] [controlport] [coder/decoder] [keydir] [keytail]\n", argv[0]);
-        exit(EXIT_FAILURE);
+    if (argc != 2) {
+    	read_cfg(NULL);
+    }else{
+    	read_cfg(argv[1]);
     }
 
-    arg1 = malloc(strlen(argv[6]) + 1);
-    strcpy(arg1, argv[6]);
-    arg2 = malloc(strlen(argv[7]) + 1);
-    strcpy(arg2, argv[7]);
-    result = get_files(arg1, arg2);
-    if (result)
-        fprintf(stderr, "%d keys\n", result);
-    else {
-        fprintf(stderr, "Keys not found\n", result);
-        exit(-2);
+    mode = 0;
+
+    if(mode == 0){
+	    /*if (argc != 6) {
+		fprintf(stderr, "Usage: %s [port] [connectip] [connectport] [controlport] [coder/decoder]\n", argv[0]);
+		exit(EXIT_FAILURE);
+	    }*/
+    }else if(mode == 1){
+	    result = get_files(arg1, arg2);
+	    if (result)
+		fprintf(stderr, "%d keys\n", result);
+	    else {
+		fprintf(stderr, "Keys not found\n", result);
+		exit(-2);
+	    }
+    }else if(mode == 2){
+	    result = get_key_plug(arg1);
+	    if (result)
+		fprintf(stderr, "%d keys\n", result);
+	    else {
+		fprintf(stderr, "Keys not found\n", result);
+		exit(-2);
+	    }
     }
 
 
-    if (atoi(argv[5]) == 1) {
-        coder = 1;
+    if (coder == 1) {
         printf("CODER\n");
     } else {
-        coder = 0;
         printf("DECODER\n");
     }
 
     fflush(stdout);
 
-    server.sin_addr.s_addr = inet_addr(argv[2]);
+    server.sin_addr.s_addr = inet_addr(ip);
     server.sin_family = AF_INET;
-    server.sin_port = htons(atoi(argv[3]));
+    server.sin_port = htons(atoi(portDest));
 
-    controlsfd = create_and_bind(argv[4]);
+    controlsfd = create_and_bind(portCtrl);
     if (controlsfd == -1)
         abort();
 
@@ -339,7 +571,7 @@ main(int argc, char *argv[]) {
         abort();
     }
 
-    sfd = create_and_bind(argv[1]);
+    sfd = create_and_bind(port);
     if (sfd == -1)
         abort();
 
@@ -448,7 +680,8 @@ main(int argc, char *argv[]) {
                     int done = 0;
                     int count = 0;
                     int inp;
-                    char buf[BLOCK_SIZE];
+                    char buf[BUF_SIZE];
+		    char *firstBuf;
                     while (1) {
                         inp = events[i].data.u64 & UINT32_MAX;
                         count = read(inp, buf, sizeof buf);
@@ -462,17 +695,32 @@ main(int argc, char *argv[]) {
                             done = 1;
                             break;
                         }
-                        if (strncmp(buf, "r", 1) == 0) {
-                            fprintf(stderr, "REREAD KEYS\n");
-                            reread = 1;
-                            break;
-                        } else
-                            if (strncmp(buf, "q", 1) == 0) {
+                        if (strncmp(buf, "quit", 4) == 0) {
                             fprintf(stderr, "EXIT\n");
                             free(events);
                             close(sfd);
                             return EXIT_SUCCESS;
-                        }
+                        }else{			    
+    			    if(mode == 0){
+				    firstBuf=buf;
+				    for(i=0;i<count-4;i++){
+					if(strncmp(buf+i, "\n", 1) == 0 && strncmp(buf+i+2, "\n", 1) == 0) {
+						firstBuf=buf+i+4;
+						count=count-i-8;
+						break;
+					}
+				    }
+				    get_keys_buffer(firstBuf, count);	
+		                    done = 1;
+		                    break;
+			    }else{
+				    if (strncmp(buf, "r", 1) == 0) {
+				            fprintf(stderr, "REREAD KEYS\n");
+				            reread = 1;
+				            break;
+				    }
+			    }
+			}
                     }
 
                     if (done) {
@@ -572,7 +820,7 @@ main(int argc, char *argv[]) {
 
                 while (1) {
                     int count;
-                    char buf[BLOCK_SIZE];
+                    char buf[BUF_SIZE];
                     if (coder == 1) {
                         if (direct == 0) {
                             count = read(inp, buf, sizeof buf);
