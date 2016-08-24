@@ -4,6 +4,12 @@ for i in openvswitch stunnel ryu mininet; do
    yum install $i -y
 done
 
+PEM_FILE=/etc/stunnel/stunnel.pem
+if [ ! -f $PEM_FILE ]; then
+  echo genearting stunnel pem file
+  openssl req -new -x509 -days 365 -nodes  -out $PEM_FILE -keyout $PEM_FILE
+fi;
+
 echo enabling openvswitch
 systemctl enable openvswitch 
 
