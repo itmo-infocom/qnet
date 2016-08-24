@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in openvswitch stunnel python-ryu mininet; do
+for i in openvswitch stunnel ryu mininet; do
    echo installing $i
    yum install $i -y
 done
