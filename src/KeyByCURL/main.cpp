@@ -11,12 +11,10 @@ int main (int ac, char *av[])
 {
     using namespace std;
 
-    if(ac!=3){
-		fprintf(stderr, "Usage: %s [ctrl1ip:ctrl1port] [ctrl2ip:ctrl2port]\n", av[0]);
+    if(ac==1){
+		fprintf(stderr, "Usage: %s [ctrl1ip:ctrl1port] [ctrl2ip:ctrl2port] ... [ctrlNip:ctrlNport]\n", av[0]);
 		exit(EXIT_FAILURE);
     }
-    std::string URL1 = av[1];
-    std::string URL2 = av[2];
     //Создадим ключ с псевдослучайной последовательностью бит
     srand(time(NULL));
     //Размер ключа
@@ -41,10 +39,9 @@ int main (int ac, char *av[])
             ss << setbase(16) << val;
         }
         cmd += ss.str();
-        string cmd2 = cmd + ' ' + URL2;
-        cmd += ' ' + URL1;
-        system(cmd.c_str());
-        system(cmd2.c_str());
+	for (int i=1; i<ac; i++){
+        	system((cmd + ' ' + av[i]).c_str());
+	}
         //cout << cmd << endl;
     }
 }
