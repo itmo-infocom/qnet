@@ -6,13 +6,17 @@
 #include <iostream>
 #include <iomanip>
 
-const std::string URL1 = "http://127.0.0.1:77";
-const std::string URL2 = "http://127.0.0.1:77";
 
-int main (void)
+int main (int ac, char *av[])
 {
     using namespace std;
 
+    if(ac!=3){
+		fprintf(stderr, "Usage: %s [ctrl1ip:ctrl1port] [ctrl2ip:ctrl2port]\n", av[0]);
+		exit(EXIT_FAILURE);
+    }
+    std::string URL1 = av[1];
+    std::string URL2 = av[2];
     //Создадим ключ с псевдослучайной последовательностью бит
     srand(time(NULL));
     //Размер ключа
