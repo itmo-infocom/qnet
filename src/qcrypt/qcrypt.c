@@ -43,73 +43,105 @@ struct key *keys = NULL;
 
 struct key *curkey;
 
-void read_cfg(char *fname){
+int doesFileExist(const char *filename) {
+    struct stat st;
+    int result = stat(filename, &st);
+    return result == 0;
+}
+
+int read_cfg(char *fname){
+        int result = 1;
 	config_t cfg;
 	config_setting_t *root;	
+	
+	if(doesFileExist(fname==NULL?"/etc/qcrypt.cfg":fname)==0){
+    	    fprintf(stderr, "File does not exists in '%s'\n",fname==NULL?"/etc/qcrypt.cfg":fname);
+	    return -1;		
+	}	
 
 	config_init(&cfg);
 	
-	if(!config_read_file(&cfg, (fname==NULL?"config.cfg":fname)))
+	if(!config_read_file(&cfg, (fname==NULL?"/etc/qcrypt.cfg":fname)))
 	{
 	    fprintf(stderr, "%s:%d - %s\n", config_error_file(&cfg),
 		    config_error_line(&cfg), config_error_text(&cfg));
 	    config_destroy(&cfg);
-	    return(EXIT_FAILURE);
+	    return -1;
 	}
 	
   	root = config_root_setting(&cfg);
 
 	if(config_lookup_int(&cfg, "mode", &mode))
 	    printf("Mode: %d\n\n", mode);
-	  else
+	  else{
 	    fprintf(stderr, "No 'mode' setting in configuration file.\n");
+	    result++;
+	  }
 
 	if(config_lookup_int(&cfg, "coder", &coder))
 	    printf("Coder: %d\n\n", coder);
-	  else
+	  else{
 	    fprintf(stderr, "No 'coder' setting in configuration file.\n");
+	    result++;
+	  }
 	int tmp = 0;
 	if(config_lookup_int(&cfg, "port", &tmp)){
 	    printf("port: %d\n\n", tmp);
     	    sprintf( port, "%d", tmp );  
-	  }else
+	  }else{
 	    fprintf(stderr, "No 'port' setting in configuration file.\n");
+	    result++;
+	  }
 
 	if(config_lookup_int(&cfg, "portDest", &tmp)){
 	    printf("portDest: %d\n\n", tmp);
     	    sprintf( portDest, "%d", tmp );  
-	  }else
+	  }else{
 	    fprintf(stderr, "No 'portDest' setting in configuration file.\n");
+	    result++;
+	  }
 
 	if(config_lookup_int(&cfg, "portCtrl", &tmp)){
 	    printf("portCtrl: %d\n\n", tmp);
     	    sprintf( portCtrl, "%d", tmp );  
-	  }else
+	  }else{
 	    fprintf(stderr, "No 'portCtrl' setting in configuration file.\n");
+	    result++;
+	  }
 
 	if(config_lookup_string(&cfg, "ip", &ip))
 	    printf("ip: %s\n\n", ip);
-	  else
+	  else{
 	    fprintf(stderr, "No 'ip' setting in configuration file.\n");
+	    result++;
+	  }
 
         if(mode == 1){
 		if(config_lookup_string(&cfg, "keyDir", &arg1))
 		    printf("keyDir: %s\n\n", arg1);
-		  else
+		  else{
 		    fprintf(stderr, "No 'keyDir' setting in configuration file.\n");
+	    	    result++;
+		  }
 
 		if(config_lookup_string(&cfg, "keyTail", &arg2))
 		    printf("keyTail: %s\n\n", arg2);
-		  else
+		  else{
 		    fprintf(stderr, "No 'keyTail' setting in configuration file.\n");
+	    	    result++;
+		  }
 	}else if(mode == 2){
 		if(config_lookup_string(&cfg, "keyFile", &arg1))
 		    printf("keyFile: %s\n\n", arg1);
-		  else
-		    fprintf(stderr, "No 'keyFile' setting in configuration file.\n");		
+		  else{
+		    fprintf(stderr, "No 'keyFile' setting in configuration file.\n");	
+	    	    result++;
+		  }	
 	}
 
   	config_destroy(&cfg);
+
+	return result;
 }
 
 struct key *get_key(char *file) {
@@ -511,12 +543,30 @@ main(int argc, char *argv[]) {
     int efd;
     struct epoll_event event;
     struct epoll_event *events;
-    int result;
+    int result = 0;
 
-    if (argc != 2) {
-    	read_cfg(NULL);
-    }else{
-    	read_cfg(argv[1]);
+    if (argc == 1) {
+    	result = read_cfg(NULL);
+    }else if(argc==2){
+	if((strncmp(argv[1], "h", 1) == 0 && strlen(argv[1]) == 1) || (strncmp(argv[1], "-h", 2) == 0 && strlen(argv[1]) == 2) || (strncmp(argv[1], "-help", 5) == 0 && strlen(argv[1]) == 5)){
+	    	fprintf(stdout, "\nCoder/Decoder for QNET\n\n");
+	    	fprintf(stdout, "Project GIT:\n https://github.com/itmo-infocom/qnet\n");
+	    	fprintf(stdout, "Sample Coder cfg:\n https://github.com/itmo-infocom/qnet/blob/master/src/qcrypt/coder.cfg\n");
+	    	fprintf(stdout, "Sample Decoder cfg:\n https://github.com/itmo-infocom/qnet/blob/master/src/qcrypt/decoder.cfg\n\n");
+	    	fprintf(stdout, "Usage with custom cfg: %s [file]\n", argv[0]);
+	    	fprintf(stdout, "Usage with cfg in /etc/qcrypt.cfg: %s\n\n", argv[0]);
+    		return EXIT_SUCCESS;
+	}else{
+    		result = read_cfg(argv[1]);
+	}
+    }
+    if(result <= 0){
+    	fprintf(stderr, "Usage with custom cfg: %s [file]\n", argv[0]);
+    	fprintf(stderr, "Usage with cfg in /etc/qcrypt.cfg: %s\n", argv[0]);
+	exit(EXIT_FAILURE);	
+    }else if(result>1){
+    	fprintf(stderr, "Your config has %d errors.\n", result-1);
+	exit(EXIT_FAILURE);
     }
 
     mode = 0;
