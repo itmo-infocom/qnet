@@ -1,0 +1,27 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "0.1.0",
+    "command": "bash",
+    "isShellCommand": true,
+    "args": ["-c"],
+    "showOutput": "always",
+    "tasks": [
+        {
+            "taskName": "Build alice",
+            "suppressTaskName": true,
+            "isBuildCommand": true,
+            "showOutput": "always",
+            "args": ["./build_alice.sh"],
+            "echoCommand": true
+        },
+        {
+            "taskName": "Build bob",
+            "suppressTaskName": true,
+            "isBuildCommand": true,
+            "showOutput": "always",
+            "args": ["./build_bob.sh"],
+            "echoCommand": true
+        }
+    ]
+}

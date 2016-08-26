@@ -1,0 +1,6 @@
+digraph G {
+  Генерация -> DMA_Start
+  DMA_Start -> DMA_Read
+
+  STB_Delay_correction -> {pyrk_pos TableRNG_Write}
+}

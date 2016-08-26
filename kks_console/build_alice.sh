@@ -1,0 +1,1 @@
+g++ -std=c++11 -pthread alice_main.cpp -o alice.out
