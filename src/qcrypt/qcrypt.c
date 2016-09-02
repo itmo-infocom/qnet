@@ -27,6 +27,8 @@ struct key {
     struct key *next;
 };
 
+config_t cfg;
+
 int fd;
 int reread = 0;
 int toclose = 0;
@@ -51,7 +53,6 @@ int doesFileExist(const char *filename) {
 
 int read_cfg(char *fname){
         int result = 1;
-	config_t cfg;
 	config_setting_t *root;	
 	
 	if(doesFileExist(fname==NULL?"/etc/qcrypt.cfg":fname)==0){
@@ -138,8 +139,6 @@ int read_cfg(char *fname){
 	    	    result++;
 		  }	
 	}
-
-  	config_destroy(&cfg);
 
 	return result;
 }
@@ -748,6 +747,7 @@ main(int argc, char *argv[]) {
                         if (strncmp(buf, "quit", 4) == 0) {
                             fprintf(stderr, "EXIT\n");
                             free(events);
+  			    config_destroy(&cfg);
                             close(sfd);
                             return EXIT_SUCCESS;
                         }else{			    
@@ -815,23 +815,24 @@ main(int argc, char *argv[]) {
                        list of fds to monitor. */
                     s = make_socket_non_blocking(infd);
                     if (s == -1) {
-                        printf("Could not make nonblock forward");
+                        printf("Could not make nonblock forward\n");
                         abort();
                     }
 
                     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
                     if (socket_desc == -1) {
-                        printf("Could not create socket");
+                        printf("Could not create socket\n");
                     }
 
                     if (connect(socket_desc, (struct sockaddr *) &server, sizeof (server)) < 0) {
-                        printf("Could not connect socket");
+                        printf("Could not connect socket\n");                        
+                        printf("%s:%d\n",inet_ntoa(server.sin_addr),ntohs(server.sin_port));
                         return 1;
                     }
 
                     s = make_socket_non_blocking(socket_desc);
                     if (s == -1) {
-                        printf("Could not make nonblock backward");
+                        printf("Could not make nonblock backward\n");
                         abort();
                     }
                     uint64_t val = infd;
@@ -929,5 +930,6 @@ main(int argc, char *argv[]) {
 
     free(events);
     close(sfd);
+    config_destroy(&cfg);
     return EXIT_SUCCESS;
 }
