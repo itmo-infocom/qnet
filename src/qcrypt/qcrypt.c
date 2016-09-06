@@ -34,7 +34,7 @@ int reread = 0;
 int toclose = 0;
 char *arg1;
 char *arg2;
-int mode;
+int mode = 0;
 int coder = 0;
 char port[50];
 char portDest[50];
@@ -567,8 +567,6 @@ main(int argc, char *argv[]) {
     	fprintf(stderr, "Your config has %d errors.\n", result-1);
 	exit(EXIT_FAILURE);
     }
-
-    mode = 0;
 
     if(mode == 0){
 	    /*if (argc != 6) {
