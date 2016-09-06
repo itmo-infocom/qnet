@@ -73,3 +73,36 @@ quit - завершение работы
 
 `./KeyByCURL.out 127.0.0.1:78 127.0.0.1:77`
 
+Cfg-файлы
+=======
+
+// РЕЖИМ ЧТЕНИЯ КЛЮЧЕЙ (int) :
+//	0 - чтение данных по curl запросу (./KeyByCURL.out)
+//	1 - чтение данных посимвольно
+//	2 - plug&play
+mode = 1;
+
+// РЕЖИМ РАБОТЫ (int) :
+//	0 - Декодер
+//	1 - Кодер
+coder = 1;
+
+//port (int) - слушающий порт
+port = 7777;
+
+//IP (string) - IP подключения
+ip = "127.0.0.1";
+
+//portDest (int) - порт подключения
+portDest = 2222;
+
+//portCtrl (int) - порт контроля
+portCtrl = 78;
+
+//if mode == 1 - ДИРЕКТОРИЯ КЛЮЧЕЙ И ОКОНЧАНЕ ФАЙЛА
+keyDir = "/opt/qcrypt/share/qbcrypt";
+keyTail = "_Bob.key";
+
+//if mode == 2 - ФАЙЛ КЛЮЧЕЙ
+keyFile = "/opt/qcrypt/share/qacrypt/Bob_Code.txt";
+
