@@ -1,2 +1,2 @@
 CFLAGS=-g
-LDLIBS=-lconfig
+LDLIBS=-lconfig -lmicrohttpd

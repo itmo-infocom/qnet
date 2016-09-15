@@ -3,8 +3,10 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,6 +14,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include <microhttpd.h>
 #include <libconfig.h>
 
 #define MAXEVENTS 64
@@ -31,7 +34,8 @@ config_t cfg;
 
 int fd;
 int reread = 0;
-int toclose = 0;
+static int waitforread = 0;
+static int toclose = 0;
 char *arg1;
 char *arg2;
 int mode = 0;
@@ -50,6 +54,74 @@ int doesFileExist(const char *filename) {
     int result = stat(filename, &st);
     return result == 0;
 }
+const char * response_data = "OK";
+
+struct postStatus {
+    bool status;
+    char *buff;
+};
+
+
+static int ahc_echo(void * cls,
+            struct MHD_Connection * connection,
+            const char * url,
+            const char * method,
+                    const char * version,
+            const char * upload_data,
+            size_t * upload_data_size,
+                    void ** ptr) {
+  const char * page = cls;
+  struct MHD_Response * response;
+  int ret;
+
+  struct postStatus *post = NULL;
+  post = (struct postStatus*)*ptr;
+
+  if(post == NULL) {
+    post = malloc(sizeof(struct postStatus));
+    post->status = false;
+    *ptr = post;
+  }
+
+  if(!post->status) {
+    post->status = true;
+    return MHD_YES;
+  } else {
+    if(*upload_data_size != 0) {
+        post->buff = malloc(*upload_data_size + 1);
+        strncpy(post->buff, upload_data, *upload_data_size);
+        *upload_data_size = 0;
+        return MHD_YES;
+    } else {
+        if (strncmp(post->buff, "quit", 4) == 0) {
+		toclose = 1;
+        }else if (mode > 0&&strncmp(post->buff, "r", 1) == 0) {
+		fprintf(stderr, "REREAD KEYS\n");
+		reread = 1;
+        }else{
+		if(mode == 0){
+			waitforread = 1;
+			get_keys_buffer(post->buff,sizeof(post->buff));
+			waitforread = 0;
+		}
+	}
+        free(post->buff);
+    }
+  } 
+
+  if(post != NULL)
+    free(post);
+
+  response = MHD_create_response_from_buffer (strlen(page),
+                                              (void*) page,
+                          MHD_RESPMEM_PERSISTENT);
+  ret = MHD_queue_response(connection,
+               MHD_HTTP_OK,
+               response);
+  MHD_destroy_response(response);
+  return ret;
+}
+
 
 int read_cfg(char *fname){
         int result = 1;
@@ -356,12 +428,14 @@ size_t crypt(char *data, int length, int socket) {
     int i; 
     
     while (count < length) {
-        if (toclose) {
+        if (toclose == 1) {
             break;
         } else {
             if (reread || curkey == NULL) {
                 fprintf(stdout, "REREAD KEYS\n");
                 reread = 0;
+		while(mode == 0&&waitforread == 1){
+		}
     		if(mode == 1){
             		get_files(arg1, arg2);
 		}else if(mode == 2){
@@ -462,6 +536,8 @@ size_t decrypt(int inpsocket, int outsocket) {
 		}
         }
     }
+    while(mode == 0&&waitforread == 1){
+    }
     read_block(inpsocket, &(curkey->curpos), sizeof (int), 0);
     read_block(inpsocket, &(size), sizeof (int), 0);
     read_block(inpsocket, in, size, 0);
@@ -537,13 +613,13 @@ static int create_and_bind(char *portInp) {
 
 int
 main(int argc, char *argv[]) {
+    struct MHD_Daemon *daemon;
     struct sockaddr_in server, controlserver;
-    int sfd, s, controlsfd;
+    int sfd, s;
     int efd;
     struct epoll_event event;
     struct epoll_event *events;
     int result = 0;
-
     if (argc == 1) {
     	result = read_cfg(NULL);
     }else if(argc==2){
@@ -600,23 +676,21 @@ main(int argc, char *argv[]) {
 
     fflush(stdout);
 
+
+
+    daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,
+               atoi(portCtrl),
+               NULL,
+               NULL,
+               &ahc_echo,
+               response_data,
+               MHD_OPTION_END);
+
+    if (NULL == daemon) return 1;
+
     server.sin_addr.s_addr = inet_addr(ip);
     server.sin_family = AF_INET;
     server.sin_port = htons(atoi(portDest));
-
-    controlsfd = create_and_bind(portCtrl);
-    if (controlsfd == -1)
-        abort();
-
-    s = make_socket_non_blocking(controlsfd);
-    if (s == -1)
-        abort();
-
-    s = listen(controlsfd, SOMAXCONN);
-    if (s == -1) {
-        perror("listen");
-        abort();
-    }
 
     sfd = create_and_bind(port);
     if (sfd == -1)
@@ -645,22 +719,17 @@ main(int argc, char *argv[]) {
         perror("epoll_ctl");
         abort();
     }
-    event.data.u64 = controlsfd;
-    event.data.u64 = (event.data.u64 << (sizeof (int)*8));
-    event.events = EPOLLIN | EPOLLET;
-    s = epoll_ctl(efd, EPOLL_CTL_ADD, controlsfd, &event);
-    if (s == -1) {
-        perror("epoll_ctl");
-        abort();
-    }
-
     /* Buffer where events are returned */
     events = calloc(MAXEVENTS, sizeof event);
 
     /* The event loop */
     while (1) {
+        if (toclose == 1) {
+	    fprintf(stderr,"CLOSE\n");
+	    break;
+        }
         int n, i;
-        n = epoll_wait(efd, events, MAXEVENTS, -1);
+        n = epoll_wait(efd, events, MAXEVENTS, 0);
         for (i = 0; i < n; i++) {
             if ((events[i].events & EPOLLERR) ||
                     (events[i].events & EPOLLHUP) ||
@@ -670,113 +739,7 @@ main(int argc, char *argv[]) {
                    ready for reading (why were we notified then?) */
                 fprintf(stderr, "epoll error\n");
                 close(events[i].data.fd);
-                continue;
-            } else if (controlsfd == (events[i].data.u64 >> (sizeof (int)*8))) {
-                if (events[i].data.fd == 0) {
-                    /* We have a notification on the listening socket, which
-                       means one or more incoming connections. */
-                    while (1) {
-                        struct sockaddr in_addr;
-                        socklen_t in_len;
-                        int infd;
-                        char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-
-                        in_len = sizeof in_addr;
-                        infd = accept(controlsfd, &in_addr, &in_len);
-                        if (infd == -1) {
-                            if ((errno == EAGAIN) ||
-                                    (errno == EWOULDBLOCK)) {
-                                /* We have processed all incoming
-                                   connections. */
-                                break;
-                            } else {
-                                perror("accept");
-                                break;
-                            }
-                        }
-
-                        s = getnameinfo(&in_addr, in_len,
-                                hbuf, sizeof hbuf,
-                                sbuf, sizeof sbuf,
-                                NI_NUMERICHOST | NI_NUMERICSERV);
-                        if (s == 0) {
-                            printf("Accepted control connection on descriptor %d "
-                                    "(host=%s, port=%s)\n", infd, hbuf, sbuf);
-                        }
-
-                        /* Make the incoming socket non-blocking and add it to the
-                           list of fds to monitor. */
-                        s = make_socket_non_blocking(infd);
-                        if (s == -1) {
-                            printf("Could not make nonblock forward");
-                            abort();
-                        }
-
-                        event.data.u64 = controlsfd;
-                        event.data.u64 = (event.data.u64 << (sizeof (int)*8) | infd);
-
-                        event.events = EPOLLIN | EPOLLET;
-                        s = epoll_ctl(efd, EPOLL_CTL_ADD, infd, &event);
-                        if (s == -1) {
-                            perror("epoll_ctl");
-                            abort();
-                        }
-                    }
-                    continue;
-                } else {
-                    int done = 0;
-                    int count = 0;
-                    int inp;
-                    char buf[BUF_SIZE];
-		    char *firstBuf;
-                    while (1) {
-                        inp = events[i].data.u64 & UINT32_MAX;
-                        count = read(inp, buf, sizeof buf);
-                        if (count == -1) {
-                            if (errno != EAGAIN) {
-                                perror("read");
-                                done = 1;
-                            }
-                            break;
-                        } else if (count == 0) {
-                            done = 1;
-                            break;
-                        }
-                        if (strncmp(buf, "quit", 4) == 0) {
-                            fprintf(stderr, "EXIT\n");
-                            free(events);
-  			    config_destroy(&cfg);
-                            close(sfd);
-                            return EXIT_SUCCESS;
-                        }else{			    
-    			    if(mode == 0){
-				    firstBuf=buf;
-				    for(i=0;i<count-4;i++){
-					if(strncmp(buf+i, "\n", 1) == 0 && strncmp(buf+i+2, "\n", 1) == 0) {
-						firstBuf=buf+i+4;
-						count=count-i-8;
-						break;
-					}
-				    }
-				    get_keys_buffer(firstBuf, count);	
-		                    done = 1;
-		                    break;
-			    }else{
-				    if (strncmp(buf, "r", 1) == 0) {
-				            fprintf(stderr, "REREAD KEYS\n");
-				            reread = 1;
-				            break;
-				    }
-			    }
-			}
-                    }
-
-                    if (done) {
-                        printf("Closed control connection on descriptor %d\n",
-                                inp);
-                        close(inp);
-                    }
-                }
+                continue;            
             } else if (sfd == events[i].data.fd) {
                 /* We have a notification on the listening socket, which
                    means one or more incoming connections. */
@@ -926,6 +889,7 @@ main(int argc, char *argv[]) {
         }
     }
 
+    MHD_stop_daemon (daemon);
     free(events);
     close(sfd);
     config_destroy(&cfg);
