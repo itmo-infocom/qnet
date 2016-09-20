@@ -59,6 +59,7 @@ const char * response_data = "OK";
 struct postStatus {
     bool status;
     char *buff;
+    int count;
 };
 
 
@@ -80,6 +81,7 @@ static int ahc_echo(void * cls,
   if(post == NULL) {
     post = malloc(sizeof(struct postStatus));
     post->status = false;
+    post->count = 0;
     *ptr = post;
   }
 
@@ -90,6 +92,7 @@ static int ahc_echo(void * cls,
     if(*upload_data_size != 0) {
         post->buff = malloc(*upload_data_size + 1);
         strncpy(post->buff, upload_data, *upload_data_size);
+    	post->count += *upload_data_size;
         *upload_data_size = 0;
         return MHD_YES;
     } else {
@@ -101,7 +104,7 @@ static int ahc_echo(void * cls,
         }else{
 		if(mode == 0){
 			waitforread = 1;
-			get_keys_buffer(post->buff,sizeof(post->buff));
+			get_keys_buffer(post->buff,post->count);
 			waitforread = 0;
 		}
 	}
