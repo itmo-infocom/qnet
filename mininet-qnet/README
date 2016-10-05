@@ -32,4 +32,4 @@ https://github.com/itmo-infocom/qnet/blob/master/doc/network.png
 3. launch tests
 ./test.sh path_to_test_data
 
-e.g. ./test.sh /root/qnet/mininet/test
+e.g. ./test.sh /usr/share/mininet-qnet/test
