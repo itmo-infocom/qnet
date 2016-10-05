@@ -1,0 +1,35 @@
+- dirs for stunnel chroots must be created
+- ryu and mininet must be installed
+- qbcrypt/qbuncrypt(old version) must be placed in qnet/mininet/bin
+
+
+prepare_vm.sh 
+ - installs mininet, python-ryu, stunnel, openvswitch;
+ - enables and starts openvswitch
+ - creates stunnel chroots.
+
+
+How to run:
+
+1. Launch ryu controller
+sample code is in ryu folder and can be launched using ./ryu.sh
+
+2. run mininet 
+
+to set alternate folders for keys one needs to set and export QCDIR and QCSUFFIX variables, defaults are:
+export QCDIR=share/qbcrypt/
+export QCSUFFIX=_Bob.key
+
+
+python mininet-qnet.py
+
+ - initializes all hosts with IP's in 10.0.0.0/24 network
+ - starts sshd for each host  (one can ssh to each host for debugging)
+ - starts stunnel, netcat and qcrypt according to configuration at 
+https://github.com/itmo-infocom/qnet/blob/master/doc/network.png
+ - starts mininet CLI (exit from CLI will remove mininet network from the VM and stops all launched processes on mininet host)
+
+3. launch tests
+./test.sh path_to_test_data
+
+e.g. ./test.sh /root/qnet/mininet/share/test
