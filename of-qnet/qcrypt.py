@@ -106,7 +106,7 @@ class QuantumSwitchController(ControllerBase):
                 r = requests.post(url, qkey)
                 body += r.text
             except: #requests.ConnectionError:
-                body += "Can't connect\n"
+                body += "URL %s: can't connect\n" % url
         return Response(content_type='application/json', body=body)
 
     @route('conf', '/conf', methods=['GET'])
