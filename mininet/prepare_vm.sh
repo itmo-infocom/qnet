@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in openvswitch stunnel ryu mininet; do
+for i in openvswitch stunnel ryu mininet python-daemon squid; do
    echo installing $i
    yum install $i -y
 done
@@ -15,6 +15,12 @@ systemctl enable openvswitch
 
 echo restarting openvswitch
 systemctl restart openvswitch 
+
+echo enabling squid
+systemctl enable squid 
+
+echo restarting squid
+systemctl restart squid 
 
 
 echo creating chroots for stunnel
