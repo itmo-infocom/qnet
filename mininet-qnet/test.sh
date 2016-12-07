@@ -3,7 +3,7 @@ if [ -n "$1" ];
 then 
    TESTDATA="$1"
 else
-   TESTDATA=/root/mininet/share/test
+   TESTDATA=/usr/share/mininet-qnet/test
 fi 
 
 

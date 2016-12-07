@@ -59,6 +59,7 @@ const char * response_data = "OK";
 struct postStatus {
     bool status;
     char *buff;
+    int count;
 };
 
 
@@ -73,13 +74,14 @@ static int ahc_echo(void * cls,
   const char * page = cls;
   struct MHD_Response * response;
   int ret;
-
+  int toclose_local = 0;
   struct postStatus *post = NULL;
   post = (struct postStatus*)*ptr;
 
   if(post == NULL) {
     post = malloc(sizeof(struct postStatus));
     post->status = false;
+    post->count = 0;
     *ptr = post;
   }
 
@@ -90,24 +92,25 @@ static int ahc_echo(void * cls,
     if(*upload_data_size != 0) {
         post->buff = malloc(*upload_data_size + 1);
         strncpy(post->buff, upload_data, *upload_data_size);
+    	post->count += *upload_data_size;
         *upload_data_size = 0;
         return MHD_YES;
     } else {
         if (strncmp(post->buff, "quit", 4) == 0) {
-		toclose = 1;
+		toclose_local = 1;
         }else if (mode > 0&&strncmp(post->buff, "r", 1) == 0) {
 		fprintf(stderr, "REREAD KEYS\n");
 		reread = 1;
         }else{
 		if(mode == 0){
 			waitforread = 1;
-			get_keys_buffer(post->buff,sizeof(post->buff));
+			get_keys_buffer(post->buff,post->count);
 			waitforread = 0;
 		}
 	}
         free(post->buff);
     }
-  } 
+  }
 
   if(post != NULL)
     free(post);
@@ -119,6 +122,9 @@ static int ahc_echo(void * cls,
                MHD_HTTP_OK,
                response);
   MHD_destroy_response(response);
+  if(toclose_local==1){
+	toclose = 1;
+  }
   return ret;
 }
 
@@ -725,7 +731,8 @@ main(int argc, char *argv[]) {
     /* The event loop */
     while (1) {
         if (toclose == 1) {
-	    fprintf(stderr,"CLOSE\n");
+	    fprintf(stdout,"CLOSE\n");
+	    sleep(1);
 	    break;
         }
         int n, i;
