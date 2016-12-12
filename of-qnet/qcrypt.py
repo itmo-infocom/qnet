@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-import requests	
+import requests
 
 from ryu.app import simple_switch
 from webob import Response
@@ -55,16 +55,31 @@ class QuantumSwitchController(ControllerBase):
 
     def __init__(self, req, link, data, **config):
         super(QuantumSwitchController, self).__init__(req, link, data, **config)
-        self.simpl_switch_spp = data[simple_switch_instance_name]
-
+        self.name = self.__class__.__name__
+        self.logger = logging.getLogger(self.name)
         #self._set_logger()
         #self.logger.info("dir(data): " + `dir(data)`)
 
+        self.simpl_switch_spp = data[simple_switch_instance_name]
+
+
         self.dpset = self.simpl_switch_spp.data['dpset']
 
-        jsondict = json.load(open(qconf))
-        self.dst = jsondict["dst"]
-        self.channels = jsondict["channels"]
+        try:
+            jsondict = json.load(open(qconf))
+            self.dst = jsondict["dst"]
+            self.channels = jsondict["channels"]
+            self.logger.info("JSON configuration loaded from %s:" % qconf)
+            self.logger.info(json.dumps(jsondict))
+        except IOError:
+            self.logger.info("Can't open %s" % qconf)
+            self.dst = {}
+            self.channels = {}
+        except ValueError:
+            self.logger.info("JSON syntaxis error in %s" % qconf)
+            self.dst = {}
+            self.channels = {}
+                        
 
     def set_flows(self, dp, f):
         ofproto = dp.ofproto
