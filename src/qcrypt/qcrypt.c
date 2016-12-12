@@ -736,7 +736,7 @@ main(int argc, char *argv[]) {
 	    break;
         }
         int n, i;
-        n = epoll_wait(efd, events, MAXEVENTS, 0);
+        n = epoll_wait(efd, events, MAXEVENTS, 100);
         for (i = 0; i < n; i++) {
             if ((events[i].events & EPOLLERR) ||
                     (events[i].events & EPOLLHUP) ||
