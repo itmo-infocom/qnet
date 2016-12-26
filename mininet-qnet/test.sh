@@ -16,8 +16,8 @@ test "$1" = '-h' -o "$1" = '-help' -o "$1" = '--help' && echo "Usage: $0 [-h|-he
 MODE=$1
 
 check_channel (){
-        c1="scrypt"
-        c2="scrypt"
+        c1="UNKNOWN"
+        c2="UNKNOWN"
         if [ -f /tmp/trans-n3.txt -a -f /tmp/trans-n4.txt ]
         then 
             c1='transparent'
@@ -25,6 +25,11 @@ check_channel (){
             if [ -f /tmp/qcrypt-n3.txt -a -f /tmp/qcrypt-n4.txt ]
             then
                 c1='qcrypt'
+            else
+                if [ -f /tmp/scrypt-n3.txt -a -f /tmp/scrypt-n4.txt ]
+                then
+                    c1='scrypt'
+                fi
             fi
         fi
 
@@ -35,6 +40,12 @@ check_channel (){
             if [ -f /tmp/qcrypt-n5.txt -a -f /tmp/qcrypt-n2.txt ]
             then
                 c2='qcrypt'
+
+            else
+                if [ -f /tmp/scrypt-n5.txt -a -f /tmp/scrypt-n2.txt ]
+                then
+                    c2='scrypt'
+                fi
             fi
         fi
         echo channel 1: $c1, channel 2: $c2
@@ -44,9 +55,11 @@ check_channel (){
 test (){
 	STATUS=OK
 	curl http://${RYUHOST}:8080/qchannel/1/5
-        rm -rf /tmp/trans-n*.txt /tmp/qcrypt-n*.txt /tmp/top-secret.txt 
+        rm -rf /tmp/trans-n*.txt /tmp/qcrypt-n*.txt /tmp/scrypt-n*.txt /tmp/top-secret.txt 
 	echo
 	ssh 10.0.0.1 "nc 10.0.0.2 1000 < $TESTDATA/test$1"
+        sleep 1
+#        ls -lt /tmp|head
 	diff /tmp/top-secret.txt $TESTDATA/test$1 || STATUS=BAD
 	echo
 	echo STATUS=$STATUS
@@ -63,7 +76,7 @@ test (){
 echo Flow tables clearing
 curl http://${RYUHOST}:8080/qchannel/1/4
 curl http://${RYUHOST}:8080/qchannel/2/4
-test 1
+# test 1
 echo Uncrypted channels
 curl http://${RYUHOST}:8080/qchannel/1/3
 curl http://${RYUHOST}:8080/qchannel/2/3

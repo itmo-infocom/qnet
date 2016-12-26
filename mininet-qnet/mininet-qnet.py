@@ -12,6 +12,9 @@ from mininet.log import setLogLevel
 from mininet.cli import CLI
 from mininet.node import Host, Node
 from mininet.util import ensureRoot, waitListening
+from os import path
+import sys
+prefix = path.dirname(sys.argv[0])
 
 cmd='/usr/sbin/sshd'
 
@@ -95,9 +98,15 @@ try:
     for i,host in enumerate([n1,n2,n3,n4,n5]):
 
         if i in (1,2,3,4):
-            host.cmd('/usr/bin/stunnel stunnel/stunnel-n%s.conf  & '%(i+1))   
-            host.cmd('sh scripts/transparent-n%s.sh 1>/tmp/host-n%s-trans.log 2>&1 & '%(i+1, i+1))
-            host.cmd('sh scripts/qcrypt-n%s.sh 1>/tmp/host-n%s-qcrypt.log 2>&1 & '%(i+1, i+1))
+
+            stunnel_script = path.join(prefix, "scripts/scrypt-n%s.sh" %(i+1)) 
+            host.cmd('sh %s 1>/tmp/host-n%s-scrypt.log 2>&1 & '%(stunnel_script, i+1))
+
+            trans_script = path.join(prefix, "scripts/transparent-n%s.sh" %(i+1)) 
+            host.cmd('sh %s 1>/tmp/host-n%s-trans.log 2>&1 & '%(trans_script, i+1))
+
+            qcrypt_script = path.join(prefix, "scripts/qcrypt-n%s.sh" %(i+1)) 
+            host.cmd('sh %s 1>/tmp/host-n%s-qcrypt.log 2>&1 & '%(qcrypt_script, i+1))
     
     net.build()
     net.start()
