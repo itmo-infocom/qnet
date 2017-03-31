@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in openvswitch stunnel ryu mininet python-daemon squid; do
+for i in openvswitch stunnel ryu mininet python-daemon squid tcpmux qcrypt qcrypt-fake-keys; do
    echo installing $i
    yum install $i -y
 done
