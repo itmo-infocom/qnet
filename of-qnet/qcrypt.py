@@ -115,6 +115,8 @@ class QuantumSwitchController(ControllerBase):
                            'addr': addr})
 
         body = "ADDR: %s QKEY: %s\n" % (addr, qkey)
+
+        self.logger.info("body: " + body)
         for url in c["qcrypt"]["key_poins"]:
             body += "URL %s RESULT:\n" % url
             try:
