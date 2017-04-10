@@ -678,20 +678,20 @@ main(int argc, char *argv[]) {
 	    }*/
     }else if(mode == 1){
 	    result = get_files(arg1, arg2);
-	    if (result)
+	    if (result){
 		fprintf(stdout, "%d keys\n", result);
 		fflush(stdout);
-	    else {
+	    }else {
 		fprintf(stdout, "Keys not found\n", result);
 		fflush(stdout);
 		exit(-2);
 	    }
     }else if(mode == 2){
 	    result = get_key_plug(arg1);
-	    if (result)
+	    if (result){
 		fprintf(stdout, "%d keys\n", result);
 		fflush(stdout);
-	    else {
+	    }else {
 		fprintf(stdout, "Keys not found\n", result);
 		fflush(stdout);
 		exit(-2);
