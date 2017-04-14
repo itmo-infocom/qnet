@@ -62,7 +62,7 @@ if len(sys.argv)==4:
         raise NotImplemented("1st arg: host1|host2")
     ip1 = sys.argv[2]
     ip2 = sys.argv[3]
-    controller = ip1
+    controller = ip2
 else:
     print 'host1|host2 ip1 ip2'
     sys.exit(1)

@@ -6,7 +6,7 @@ else
    TESTDATA=/usr/share/mininet-qnet/test
 fi 
 
-host2=192.168.122.76
+host1=192.168.0.98
 
 
 RYUHOST=localhost
@@ -56,16 +56,16 @@ test (){
 	STATUS=OK
 	curl http://${RYUHOST}:8080/qchannel/1/5
         rm -rf /tmp/trans-n*.txt /tmp/qcrypt-n*.txt /tmp/scrypt-n*.txt /tmp/top-secret.txt 
-        ssh root@${host2}  'rm -rf /tmp/trans-n*.txt /tmp/qcrypt-n*.txt /tmp/scrypt-n*.txt /tmp/top-secret.txt'
+        ssh root@${host1}  'rm -rf /tmp/trans-n*.txt /tmp/qcrypt-n*.txt /tmp/scrypt-n*.txt /tmp/top-secret.txt'
 	echo
-	ssh 10.0.0.1 "nc 10.0.0.2 1000 < $TESTDATA/test$1"
+	ssh root@${host1} ssh 10.0.0.1 "nc 10.0.0.2 1000 < $TESTDATA/test$1"
         sleep 1
 #        ls -lt /tmp|head
 
-        scp root@${host2}:/tmp/trans-n?.txt /tmp/ 2>/dev/null
-        scp root@${host2}:/tmp/qcrypt-n?.txt /tmp/ 2>/dev/null
-        scp root@${host2}:/tmp/scrypt-n?.txt /tmp/ 2>/dev/null
-        scp root@${host2}:/tmp/top-secret.txt /tmp/ 2>/dev/null
+        scp root@${host1}:/tmp/trans-n?.txt /tmp/ 2>/dev/null
+        scp root@${host1}:/tmp/qcrypt-n?.txt /tmp/ 2>/dev/null
+        scp root@${host1}:/tmp/scrypt-n?.txt /tmp/ 2>/dev/null
+#        scp root@${host1}:/tmp/top-secret.txt /tmp/ 2>/dev/null
 
 	diff /tmp/top-secret.txt $TESTDATA/test$1 || STATUS=BAD
 	echo
@@ -80,9 +80,15 @@ test (){
 	fi
 }
 
+
 echo Flow tables clearing
 curl http://${RYUHOST}:8080/qchannel/1/4
 curl http://${RYUHOST}:8080/qchannel/2/4
+
+echo loading keys
+KeyByCURL.out 127.0.0.1:8080/qkey/1
+KeyByCURL.out 127.0.0.1:8080/qkey/2
+
 # test 1
 echo Uncrypted channels
 curl http://${RYUHOST}:8080/qchannel/1/3

@@ -28,3 +28,12 @@ for i in `seq 2 5`; do
   mkdir -p /var/tmp/stunnel-n${i}/var/log/
   chown nobody.nobody /var/tmp/stunnel-n${i} -R
 done
+
+echo configuring firewall
+
+firewall-cmd --permanent --zone=public --add-port=6633/tcp
+firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT 0 -p gre -j ACCEPT
+firewall-cmd --permanent --zone=public --add-port=8080/tcp
+firewall-cmd --reload
+
+
