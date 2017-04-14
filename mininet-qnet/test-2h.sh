@@ -88,6 +88,7 @@ curl http://${RYUHOST}:8080/qchannel/2/4
 echo loading keys
 KeyByCURL.out 127.0.0.1:8080/qkey/1
 KeyByCURL.out 127.0.0.1:8080/qkey/2
+echo
 
 # test 1
 echo Uncrypted channels
@@ -127,3 +128,8 @@ echo Quantum -- SSL
 curl http://${RYUHOST}:8080/qchannel/1/1
 curl http://${RYUHOST}:8080/qchannel/2/0
 test 1
+
+echo Flow tables clearing
+curl http://${RYUHOST}:8080/qchannel/1/4
+curl http://${RYUHOST}:8080/qchannel/2/4
+
