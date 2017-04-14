@@ -99,7 +99,8 @@ static int ahc_echo(void * cls,
         if (strncmp(post->buff, "quit", 4) == 0) {
 		toclose_local = 1;
         }else if (mode > 0&&strncmp(post->buff, "r", 1) == 0) {
-		fprintf(stderr, "REREAD KEYS\n");
+		fprintf(stdout, "REREAD KEYS\n");
+		fflush(stdout);
 		reread = 1;
         }else{
 		if(mode == 0){
@@ -134,7 +135,8 @@ int read_cfg(char *fname){
 	config_setting_t *root;	
 	
 	if(doesFileExist(fname==NULL?"/etc/qcrypt.cfg":fname)==0){
-    	    fprintf(stderr, "File does not exists in '%s'\n",fname==NULL?"/etc/qcrypt.cfg":fname);
+    	fprintf(stdout, "File does not exists in '%s'\n",fname==NULL?"/etc/qcrypt.cfg":fname);
+		fflush(stdout);
 	    return -1;		
 	}	
 
@@ -142,8 +144,9 @@ int read_cfg(char *fname){
 	
 	if(!config_read_file(&cfg, (fname==NULL?"/etc/qcrypt.cfg":fname)))
 	{
-	    fprintf(stderr, "%s:%d - %s\n", config_error_file(&cfg),
+	    fprintf(stdout, "%s:%d - %s\n", config_error_file(&cfg),
 		    config_error_line(&cfg), config_error_text(&cfg));
+		fflush(stdout);
 	    config_destroy(&cfg);
 	    return -1;
 	}
@@ -153,14 +156,16 @@ int read_cfg(char *fname){
 	if(config_lookup_int(&cfg, "mode", &mode))
 	    printf("Mode: %d\n\n", mode);
 	  else{
-	    fprintf(stderr, "No 'mode' setting in configuration file.\n");
+	    fprintf(stdout, "No 'mode' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 
 	if(config_lookup_int(&cfg, "coder", &coder))
 	    printf("Coder: %d\n\n", coder);
 	  else{
-	    fprintf(stderr, "No 'coder' setting in configuration file.\n");
+	    fprintf(stdout, "No 'coder' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 	int tmp = 0;
@@ -168,7 +173,8 @@ int read_cfg(char *fname){
 	    printf("port: %d\n\n", tmp);
     	    sprintf( port, "%d", tmp );  
 	  }else{
-	    fprintf(stderr, "No 'port' setting in configuration file.\n");
+	    fprintf(stdout, "No 'port' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 
@@ -176,7 +182,8 @@ int read_cfg(char *fname){
 	    printf("portDest: %d\n\n", tmp);
     	    sprintf( portDest, "%d", tmp );  
 	  }else{
-	    fprintf(stderr, "No 'portDest' setting in configuration file.\n");
+	    fprintf(stdout, "No 'portDest' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 
@@ -184,37 +191,42 @@ int read_cfg(char *fname){
 	    printf("portCtrl: %d\n\n", tmp);
     	    sprintf( portCtrl, "%d", tmp );  
 	  }else{
-	    fprintf(stderr, "No 'portCtrl' setting in configuration file.\n");
+	    fprintf(stdout, "No 'portCtrl' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 
 	if(config_lookup_string(&cfg, "ip", &ip))
 	    printf("ip: %s\n\n", ip);
 	  else{
-	    fprintf(stderr, "No 'ip' setting in configuration file.\n");
+	    fprintf(stdout, "No 'ip' setting in configuration file.\n");
+		fflush(stdout);
 	    result++;
 	  }
 
         if(mode == 1){
 		if(config_lookup_string(&cfg, "keyDir", &arg1))
-		    printf("keyDir: %s\n\n", arg1);
+			printf("keyDir: %s\n\n", arg1);
 		  else{
-		    fprintf(stderr, "No 'keyDir' setting in configuration file.\n");
-	    	    result++;
+			fprintf(stdout, "No 'keyDir' setting in configuration file.\n");
+			fflush(stdout);
+	    	result++;
 		  }
 
 		if(config_lookup_string(&cfg, "keyTail", &arg2))
 		    printf("keyTail: %s\n\n", arg2);
 		  else{
-		    fprintf(stderr, "No 'keyTail' setting in configuration file.\n");
-	    	    result++;
+		    fprintf(stdout, "No 'keyTail' setting in configuration file.\n");
+			fflush(stdout);
+	    	result++;
 		  }
 	}else if(mode == 2){
 		if(config_lookup_string(&cfg, "keyFile", &arg1))
 		    printf("keyFile: %s\n\n", arg1);
 		  else{
-		    fprintf(stderr, "No 'keyFile' setting in configuration file.\n");	
-	    	    result++;
+		    fprintf(stdout, "No 'keyFile' setting in configuration file.\n");
+			fflush(stdout);
+	    	result++;
 		  }	
 	}
 
@@ -352,7 +364,7 @@ struct key *key_alloc()
     // Find last key in chain
     k = keys;
     while(k->next != keys) {
-      //fprintf(stderr, "key->next=0x%x\n", k->next);
+      //fprintf(stdout, "key->next=0x%x\n", k->next);
       k=k->next;
     }
     k->next = key;
@@ -380,7 +392,8 @@ int get_key_plug(char *file)
         keys = NULL;
     }
 
-  fprintf(stderr, "file=%s\n", file);
+  fprintf(stdout, "file=%s\n", file);
+	fflush(stdout);
   f = fopen(file, "r");
   if (f == NULL) return(0);
 
@@ -425,6 +438,7 @@ void print_key(struct key * key) {
         fprintf(stdout, "%x ", key->num[i]);
     fprintf(stdout, "%d", key->curpos);
     fprintf(stdout, "\n");
+	fflush(stdout);
 }
 
 size_t crypt(char *data, int length, int socket) {
@@ -439,6 +453,7 @@ size_t crypt(char *data, int length, int socket) {
         } else {
             if (reread || curkey == NULL) {
                 fprintf(stdout, "REREAD KEYS\n");
+				fflush(stdout);
                 reread = 0;
 		while(mode == 0&&waitforread == 1){
 		}
@@ -448,7 +463,8 @@ size_t crypt(char *data, int length, int socket) {
 	    		get_key_plug(arg1);
 		}else{
 			if(keys==NULL){				
-  				fprintf(stderr, "NO KEYS\n");
+  				fprintf(stdout, "NO KEYS\n");
+				fflush(stdout);
 				return 0;
 			}
 		}
@@ -588,7 +604,8 @@ static int create_and_bind(char *portInp) {
 
     s = getaddrinfo(NULL, portInp, &hints, &result);
     if (s != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        fprintf(stdout, "getaddrinfo: %s\n", gai_strerror(s));
+		fflush(stdout);
         return -1;
     }
 
@@ -607,7 +624,8 @@ static int create_and_bind(char *portInp) {
     }
 
     if (rp == NULL) {
-        fprintf(stderr, "Could not bind\n");
+        fprintf(stdout, "Could not bind\n");
+		fflush(stdout);
         return -1;
     }
 
@@ -636,52 +654,58 @@ main(int argc, char *argv[]) {
 	    	fprintf(stdout, "Sample Decoder cfg:\n https://github.com/itmo-infocom/qnet/blob/master/src/qcrypt/decoder.cfg\n\n");
 	    	fprintf(stdout, "Usage with custom cfg: %s [file]\n", argv[0]);
 	    	fprintf(stdout, "Usage with cfg in /etc/qcrypt.cfg: %s\n\n", argv[0]);
+			fflush(stdout);
     		return EXIT_SUCCESS;
 	}else{
     		result = read_cfg(argv[1]);
 	}
     }
     if(result <= 0){
-    	fprintf(stderr, "Usage with custom cfg: %s [file]\n", argv[0]);
-    	fprintf(stderr, "Usage with cfg in /etc/qcrypt.cfg: %s\n", argv[0]);
+    	fprintf(stdout, "Usage with custom cfg: %s [file]\n", argv[0]);
+    	fprintf(stdout, "Usage with cfg in /etc/qcrypt.cfg: %s\n", argv[0]);
+		fflush(stdout);
 	exit(EXIT_FAILURE);	
     }else if(result>1){
-    	fprintf(stderr, "Your config has %d errors.\n", result-1);
+    	fprintf(stdout, "Your config has %d errors.\n", result-1);
+		fflush(stdout);
 	exit(EXIT_FAILURE);
     }
 
     if(mode == 0){
 	    /*if (argc != 6) {
-		fprintf(stderr, "Usage: %s [port] [connectip] [connectport] [controlport] [coder/decoder]\n", argv[0]);
+		fprintf(stdout, "Usage: %s [port] [connectip] [connectport] [controlport] [coder/decoder]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	    }*/
     }else if(mode == 1){
 	    result = get_files(arg1, arg2);
-	    if (result)
-		fprintf(stderr, "%d keys\n", result);
-	    else {
-		fprintf(stderr, "Keys not found\n", result);
+	    if (result){
+		fprintf(stdout, "%d keys\n", result);
+		fflush(stdout);
+	    }else {
+		fprintf(stdout, "Keys not found\n", result);
+		fflush(stdout);
 		exit(-2);
 	    }
     }else if(mode == 2){
 	    result = get_key_plug(arg1);
-	    if (result)
-		fprintf(stderr, "%d keys\n", result);
-	    else {
-		fprintf(stderr, "Keys not found\n", result);
+	    if (result){
+		fprintf(stdout, "%d keys\n", result);
+		fflush(stdout);
+	    }else {
+		fprintf(stdout, "Keys not found\n", result);
+		fflush(stdout);
 		exit(-2);
 	    }
     }
 
 
     if (coder == 1) {
-        printf("CODER\n");
+        fprintf(stdout,"CODER\n");
+		fflush(stdout);
     } else {
-        printf("DECODER\n");
+        fprintf(stdout,"DECODER\n");
+		fflush(stdout);
     }
-
-    fflush(stdout);
-
 
 
     daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,
@@ -744,7 +768,8 @@ main(int argc, char *argv[]) {
                     !(events[i].events & EPOLLOUT))) {
                 /* An error has occured on this fd, or the socket is not
                    ready for reading (why were we notified then?) */
-                fprintf(stderr, "epoll error\n");
+                fprintf(stdout, "epoll error\n");
+				fflush(stdout);
                 close(events[i].data.fd);
                 continue;            
             } else if (sfd == events[i].data.fd) {
@@ -775,32 +800,37 @@ main(int argc, char *argv[]) {
                             sbuf, sizeof sbuf,
                             NI_NUMERICHOST | NI_NUMERICSERV);
                     if (s == 0) {
-                        printf("Accepted connection on descriptor %d "
+                        fprintf(stdout,"Accepted connection on descriptor %d "
                                 "(host=%s, port=%s)\n", infd, hbuf, sbuf);
+						fflush(stdout);
                     }
 
                     /* Make the incoming socket non-blocking and add it to the
                        list of fds to monitor. */
                     s = make_socket_non_blocking(infd);
                     if (s == -1) {
-                        printf("Could not make nonblock forward\n");
+                        fprintf(stdout,"Could not make nonblock forward\n");
+						fflush(stdout);
                         abort();
                     }
 
                     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
                     if (socket_desc == -1) {
-                        printf("Could not create socket\n");
+                        fprintf(stdout,"Could not create socket\n");
+						fflush(stdout);
                     }
 
                     if (connect(socket_desc, (struct sockaddr *) &server, sizeof (server)) < 0) {
-                        printf("Could not connect socket\n");                        
-                        printf("%s:%d\n",inet_ntoa(server.sin_addr),ntohs(server.sin_port));
+                        fprintf(stdout,"Could not connect socket\n");                        
+                        fprintf(stdout,"%s:%d\n",inet_ntoa(server.sin_addr),ntohs(server.sin_port));
+						fflush(stdout);
                         return 1;
                     }
 
                     s = make_socket_non_blocking(socket_desc);
                     if (s == -1) {
-                        printf("Could not make nonblock backward\n");
+                        fprintf(stdout,"Could not make nonblock backward\n");
+						fflush(stdout);
                         abort();
                     }
                     uint64_t val = infd;
@@ -877,19 +907,21 @@ main(int argc, char *argv[]) {
 
                 if (done) {
                     if (coder == 1) {
-                        printf("Closed connection on descriptor %d\n",
+                        fprintf(stdout,"Closed connection on descriptor %d\n",
                                 outp);
                         close(outp);
-                        printf("Closed connection on descriptor %d\n",
+                        fprintf(stdout,"Closed connection on descriptor %d\n",
                                 inp);
                         close(inp);
+						fflush(stdout);
                     } else {
-                        printf("Closed connection on descriptor %d\n",
+                        fprintf(stdout,"Closed connection on descriptor %d\n",
                                 inp);
                         close(inp);
-                        printf("Closed connection on descriptor %d\n",
+                        fprintf(stdout,"Closed connection on descriptor %d\n",
                                 outp);
                         close(outp);
+						fflush(stdout);
                     }
                 }
             }
