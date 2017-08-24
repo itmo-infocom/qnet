@@ -15,7 +15,8 @@ from ryu.lib.ofctl_v1_0 import mod_flow_entry, delete_flow_entry
 
 
 simple_switch_instance_name = 'qchannel_api_app'
-qconf = '/var/lib/qcrypt/channels.json'
+qconf_default = '/var/lib/qcrypt/channels.json'
+qconf = 'channels.json'
 #qpath = '/etc/qcrypt/'
 qpath = '/usr/share/qcrypt/'
 
@@ -67,14 +68,19 @@ class QuantumSwitchController(ControllerBase):
 
         try:
             jsondict = json.load(open(qconf))
+            self.logger.info("JSON configuration loaded from %s:" % qconf)
+        except IOError:
+            try:
+                jsondict = json.load(open(qconf_default))
+                self.logger.info("JSON configuration loaded from %s:" % qconf_default)
+            except IOError:
+                self.logger.info("Can't open %s and %s" % (qconf,qconf_default))
+                self.dst = {}
+                self.channels = {}
+        try:
             self.dst = jsondict["dst"]
             self.channels = jsondict["channels"]
-            self.logger.info("JSON configuration loaded from %s:" % qconf)
             self.logger.info(json.dumps(jsondict))
-        except IOError:
-            self.logger.info("Can't open %s" % qconf)
-            self.dst = {}
-            self.channels = {}
         except ValueError:
             self.logger.info("JSON syntaxis error in %s" % qconf)
             self.dst = {}
