@@ -28,6 +28,7 @@ def connectToRootNS( network, switch, ip, routes ):
     # Add routes from root ns to hosts
     for route in routes:
         root.cmd( 'route add -net ' + route + ' dev ' + str( intf ) )
+        root.cmd( 'ip link set mtu 1400 dev '+str(intf) )
 
 def sshd( network, cmd='/usr/sbin/sshd', opts='-D -o UseDNS=no -u0',
           ip='10.123.123.1/32', routes=None, switch=None ):
@@ -53,31 +54,45 @@ def sshd( network, cmd='/usr/sbin/sshd', opts='-D -o UseDNS=no -u0',
         print( host.name, host.IP() )
     print()
 
-if len(sys.argv)==4:
-    if sys.argv[1] == 'host1':
+if len(sys.argv)==3:
+    if sys.argv[2] == 'host1':
         hostn = 1
-    elif sys.argv[1] == 'host2':
+    elif sys.argv[2] == 'host2':
         hostn = 2
+    elif sys.argv[2] == 'host3':
+        hostn = 3
     else:
-        raise NotImplemented("1st arg: host1|host2")
-    ip1 = sys.argv[2]
-    ip2 = sys.argv[3]
-    controller = ip2
+        raise NotImplemented("2nd arg: host1|host2|host3")
+    config = sys.argv[1]
+    exec(open(config).read())
 else:
-    print 'host1|host2 ip1 ip2'
+    print 'config host1|host2'
     sys.exit(1)
 
 
+def parse_controller(address_port):
+    return (address_port.split(':')[0],int(address_port.split(':')[1]))
 
 setLogLevel( 'info' )
 try:
-    # two switches with a single remote controller on localhost:6633  
-    if hostn == 1:
-       c0 = RemoteController( 'c0', ip=controller, port=6633 )
-       cmap = { 's1': c0 }
+    single_host = False
+    if 'single_host' in config and config['single_host']:
+        hostn_list = filter(lambda x: isinstance(x,int), config.keys())
+        single_host = True
     else:
-       c1 = RemoteController( 'c1', ip=controller, port=6633 )
-       cmap = { 's2': c1 }
+        hostn_list = [hostn,]
+
+    cmap = {}
+    for i in range(len(hostn_list)):
+        hostn_=hostn_list[i]
+        sw = config[hostn_]['sw']
+        hosts = config[hostn_]['hosts']
+        controller = config[hostn_]['controller']
+        port = config[hostn_]['port']
+
+        c0 = RemoteController( 'c%s'%i, ip=controller, port=port )
+        cmap[sw] = c0 
+
  
 
     class MultiSwitch( OVSSwitch ):
@@ -86,20 +101,18 @@ try:
             return OVSSwitch.start( self, [ cmap[ self.name ] ] )
 
     net = Mininet( switch=MultiSwitch, build=False )
-
-    if hostn == 1:
-        s = net.addSwitch('s1')
-        for n in (1,3):
-            h = net.addHost( 'h%d' % n, ip = '10.0.0.%s'%n , mac ='00:00:00:00:00:%s'%(format(n, '02x')) )
+    switches={}
+    for i in range(len(hostn_list)):
+        hostn_=hostn_list[i]
+        sw = config[hostn_]['sw']
+        hosts = config[hostn_]['hosts']    
+        s = net.addSwitch(sw)
+        switches[hostn_] = s
+        for n in hosts:
+            h = net.addHost( 'h%d' % n, ip = '10.0.0.%s'%n , mac ='00:00:00:00:00:%s'%(format(n, '02x')))
             net.addLink( s, h)
-        sshd(network=net, ip='10.0.0.100/8',switch=s)
-    else:
-        s = net.addSwitch('s2')
-        for n in (2,4,5):
-            h = net.addHost( 'h%d' % n, ip = '10.0.0.%s'%n , mac ='00:00:00:00:00:%s'%(format(n, '02x'))  )
-            net.addLink( s, h)
-        sshd(network=net,ip='10.0.0.101/8',switch=s)
-
+            h.cmd('ip link set mtu 1400 dev h%s-eth0'%n)
+    sshd(network=net, ip='10.0.0.10%s/8'%(hostn-1),switch=s)
 
 
 
@@ -115,18 +128,31 @@ try:
 
             qcrypt_script = path.join(prefix, "scripts/qcrypt-n%s.sh" %(i)) 
             host.cmd('sh %s 1>/tmp/host-n%s-qcrypt.log 2>&1 & '%(qcrypt_script, i)) 
-    
+   
+    tunnels=config['tunnels']
+    if single_host:
+        for i in range(0,len(tunnels)):
+            tunnel = tunnels[i]
+            net.addLink(switches[tunnel[0]], switches[tunnel[1]])       
+
+ 
     net.build()
     net.start()
-    if hostn == 1:
-        gre_ip = ip2
-        switch = 's1'
-    else:
-        gre_ip = ip1
-        switch = 's2'
-    s.cmd('ovs-vsctl add-port '+switch+' '+switch+'-gre1 -- set interface '+switch+'-gre1 type=gre options:remote_ip='+gre_ip)
-    s.cmdPrint('ovs-vsctl show')
-    
+    if not single_host:
+        for i in range(0,len(tunnels)):
+            tunnel = tunnels[i]
+            if hostn not in tunnel:
+                continue
+            if hostn==tunnel[0]:
+                gre_ip = config[tunnel[1]]['ip']
+            else:
+                gre_ip = config[tunnel[0]]['ip']
+            switch = config[hostn]['sw'] 
+            gren='gre'+str(i+1)
+            s.cmd('ovs-vsctl add-port '+switch+' '+switch+'-'+gren+' -- set interface '+switch+'-'+gren+' type=gre options:remote_ip='+gre_ip)
+            s.cmdPrint('ovs-vsctl show')
+        
+
 
     CLI( net )
 except Exception as e:
