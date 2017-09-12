@@ -28,6 +28,7 @@ class Codec(object):
                 self.irq = 2
 
     def xor(self, v1, v2):
+        result = []
         if self.is_fpga:
             self.key.write(v1)
             self.input.write(v2)
@@ -36,7 +37,9 @@ class Codec(object):
                 data = self.output.read()
                 return data
         else:
-            return v1 ^ v2
+            for x in range(0, len(v1)):
+                result.append(v1[x] ^ v2[x])
+            return result
         return None
 
     def encode(self, data):
@@ -50,14 +53,24 @@ class Codec(object):
             count = self.key_manager.block_size if len(data) > self.key_manager.block_size else len(data)
             if count + key.curpos > key.size:
                 key = self.key_manager.next_key()
+            if count > key.size:
+                count = key.size
             for x in range(0, 8):
                 result += struct.pack('B', key.num[x])
             result += struct.pack('I', key.curpos)
             result += struct.pack('I', count)
-            for x in range(0, count):
+            towork = [ord(i) for i in data[:count]]
+            tokey = [key.key[i] for i in range(key.curpos, key.curpos+count)]
+            if count < self.key_manager.block_size:
+                for n in range(count, self.key_manager.block_size):
+                    towork.append(0)
+                    tokey.append(0)
+            for x in self.xor(towork, tokey)[:count]:
+                result += struct.pack('B', x)
+            #for x in range(0, count):
                 #print ord(data[x])
                 #print key.key[key.curpos+x]
-                result += struct.pack('B', self.xor(ord(data[x]), key.key[key.curpos+x]))
+                #result += struct.pack('B', self.xor(ord(data[x]), key.key[key.curpos+x]))
             key.curpos += count
             data = data[count:]
         return result
@@ -76,9 +89,17 @@ class Codec(object):
                 if count > len(data) - 16:
                     errors = 2
                     break
-                for x in range(0, count):
-                    val, = struct.unpack('B', data[x+16])
-                    result += chr(self.xor(val, key.key[curpos+x]))
+                towork = [struct.unpack('B', data[i+16])[0] for i in range(0, count)]
+                tokey = [key.key[i] for i in range(curpos, curpos+count)]
+                if count < self.key_manager.block_size:
+                    for n in range(count, self.key_manager.block_size):
+                        towork.append(0)
+                        tokey.append(0)
+                for x in self.xor(towork, tokey)[:count]:
+                    result += chr(x)
+                #for x in range(0, count):
+                    #val, = struct.unpack('B', data[x+16])
+                    #result += chr(self.xor(val, key.key[curpos+x]))
                     #print chr(val ^ key.key[curpos+x])
                     #print key.key[curpos+x]
                 data = data[count+16:]
@@ -101,7 +122,7 @@ class Key(object):
 class KeyManager(object):
     def __init__(self):
         self.buffer_size = 2048
-        self.block_size = self.buffer_size/32
+        self.block_size = 256
         self.keys = []
         self.cur_key = None
         self.count = 0
@@ -420,7 +441,10 @@ if __name__ == '__main__':
     manager = KeyManager()
 
     server = Proxy(listen_address=('0.0.0.0', port),
-                   target_address=(ip, portDest), codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=False), work_mode=mode, is_coder=coder == 1)
+                   target_address=(ip, portDest),
+                   codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=False),
+                   work_mode=mode,
+                   is_coder=coder == 1)
     control = Control('0.0.0.0', portCtrl, manager)
     try:
         control.main_loop()
