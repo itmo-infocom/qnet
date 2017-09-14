@@ -9,7 +9,6 @@ from nifpga import Session
 
 timeout_ms = 300
 
-
 class Codec(object):
     def __init__(self, key_manager, first_slot, is_fpga):
         self.key_manager = key_manager
@@ -112,32 +111,36 @@ class Codec(object):
 
 class Key(object):
     def __init__(self, data):
+        self.ready = False
+        self.size = len(data)
         data = bytearray(data,'ascii')
         self.key = data
         self.num = self.key[0:8]
         self.curpos = 0
-        self.size = len(data)
-
+        self.ready = True
 
 class KeyManager(object):
     def __init__(self):
         self.buffer_size = 2048
         self.block_size = 256
         self.keys = []
-        self.cur_key = None
-        self.count = 0
+        self.cur_key = -1
+        #self.count = 0
 
     def read_keys(self, work_mode, array):
         #self.keys = []
-        self.cur_key = -1
-        self.count = 0
+        #self.cur_key = -1
+        #self.count = 0
         if work_mode == 0:
-            while len(array) > 64:
-                self.keys.append(Key(array[:self.buffer_size]))
-                array = array[self.buffer_size:]
-                self.count += 1
-            if len(self.keys) > 0:
+            while len(array) > self.block_size:
+                self.keys.append(Key(array[:self.block_size]))
+                array = array[self.block_size:]
+                #self.count += 1
+            kl = len(self.keys)
+            if kl > 0:
                 self.cur_key = 0
+                if kl > 10:
+                    self.keys = self.keys[kl/2:]
 
     def print_keys(self):
         for key in self.keys:
@@ -147,6 +150,8 @@ class KeyManager(object):
 
     def current_key(self):
         if self.cur_key > -1:
+            if self.cur_key > len(self.keys):
+                self.cur_key = 0 
             return self.keys[self.cur_key]
         return None
 
@@ -154,9 +159,13 @@ class KeyManager(object):
         if self.cur_key > -1:
             self.keys[self.cur_key].curpos = 0
             self.cur_key += 1
-            if self.cur_key == len(self.keys):
+            if self.cur_key >= len(self.keys):
                 self.cur_key = 0
-            return self.keys[self.cur_key]
+            if self.keys[self.cur_key].ready:
+                self.keys[self.cur_key].curpos = 0
+                return self.keys[self.cur_key]
+            else:
+                return self.next_key()
         return None
 
     def get_key_by_num(self, num):
@@ -317,7 +326,7 @@ class Proxy(object):
                 data = self.buffers[fileno] + data
             #else:
             try:
-                    print "relay_data"
+                    #print "relay_data"
                     #print len(data)
                     #print [hex(ord(i)) for i in data]
                     #print data
@@ -325,7 +334,7 @@ class Proxy(object):
                     #print [hex(ord(i)) for i in result]
                     #print self.codec.decode(result)
                     #if len(data) > self.codec.key_manager.block_size:
-                    print len(data)
+                    #print len(data)
                     if fileno in self.inputs:
                         data = self.codec.encode(data)
                         try:
@@ -343,9 +352,9 @@ class Proxy(object):
                                 self.buffers[fileno] = data[len(data)-result['diff']:]
                             else:
                                 self.buffers[fileno] = b''
-                            print "DIFF"
-                            print result['diff']
-                            print result['errors']
+                            #print "DIFF"
+                            #print result['diff']
+                            #print result['errors']
                             self.channels[fileno].send(result['result'])
 
                     #else:
