@@ -122,7 +122,7 @@ class Key(object):
 class KeyManager(object):
     def __init__(self):
         self.buffer_size = 2048
-        self.block_size = 256
+        self.block_size = 768
         self.keys = []
         self.cur_key = -1
         #self.count = 0
