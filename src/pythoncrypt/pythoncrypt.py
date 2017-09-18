@@ -136,11 +136,6 @@ class KeyManager(object):
                 self.keys.append(Key(array[:self.block_size]))
                 array = array[self.block_size:]
                 #self.count += 1
-            kl = len(self.keys)
-            if kl > 0:
-                self.cur_key = 0
-                if kl > 10:
-                    self.keys = self.keys[kl/2:]
 
     def print_keys(self):
         for key in self.keys:
@@ -159,8 +154,14 @@ class KeyManager(object):
         if self.cur_key > -1:
             self.keys[self.cur_key].curpos = 0
             self.cur_key += 1
+            kl = len(self.keys)
+            if kl > 20:
+                self.keys = self.keys[10:]
             if self.cur_key >= len(self.keys):
-                self.cur_key = 0
+                if len(self.keys) > 15:
+                    self.cur_key = 10
+                else:
+                    self.cur_key = 0
             if self.keys[self.cur_key].ready:
                 self.keys[self.cur_key].curpos = 0
                 return self.keys[self.cur_key]
