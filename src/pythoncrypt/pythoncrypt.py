@@ -119,10 +119,13 @@ class Key(object):
         self.curpos = 0
         self.ready = True
 
-class KeyManager(object):
+class KeyManager(object, is_fpga):
     def __init__(self):
         self.buffer_size = 2048
-        self.block_size = 768
+        if is_fpga:
+            self.block_size = 768
+        else:
+            self.block_size = 64
         self.keys = []
         self.cur_key = -1
         #self.count = 0
@@ -448,7 +451,7 @@ if __name__ == '__main__':
     portDest = int(parser.get('default', 'portDest'))
     ip = parser.get('default', 'ip').replace('"', '')
 
-    manager = KeyManager()
+    manager = KeyManager(is_fpga=False)
 
     server = Proxy(listen_address=('0.0.0.0', port),
                    target_address=(ip, portDest),
