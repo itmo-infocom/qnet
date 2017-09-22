@@ -121,12 +121,9 @@ class Key(object):
         self.ready = True
 
 class KeyManager(object):
-    def __init__(self, is_fpga):
+    def __init__(self, packet_size):
         self.buffer_size = 2048
-        if is_fpga:
-            self.block_size = 768
-        else:
-            self.block_size = 64
+        self.block_size = packet_size
         self.keys = []
         self.cur_key = -1
         #self.count = 0
@@ -134,11 +131,12 @@ class KeyManager(object):
     def read_keys(self, work_mode, array):
         #self.keys = []
         #self.count = 0
+        if len(array) > self.block_size:
+            self.cur_key = 0
         if work_mode == 0:
             while len(array) > self.block_size:
                 self.keys.append(Key(array[:self.block_size]))
                 array = array[self.block_size:]
-                self.cur_key = 0
                 #self.count += 1
 
     def print_keys(self):
@@ -448,15 +446,17 @@ if __name__ == '__main__':
     mode = int(parser.get('default', 'mode'))
     coder = int(parser.get('default', 'coder'))
     port = int(parser.get('default', 'port'))
+    is_fpga = int(parser.get('default', 'isFpga'));
+    packet_size = int(parser.get('default', 'packetSize'));
     portCtrl = int(parser.get('default', 'portCtrl'))
     portDest = int(parser.get('default', 'portDest'))
     ip = parser.get('default', 'ip').replace('"', '')
 
-    manager = KeyManager(is_fpga=False)
+    manager = KeyManager(packet_size=packet_size)
 
     server = Proxy(listen_address=('0.0.0.0', port),
                    target_address=(ip, portDest),
-                   codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=False),
+                   codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=is_fpga == 1),
                    work_mode=mode,
                    is_coder=coder == 1)
     control = Control('0.0.0.0', portCtrl, manager)
