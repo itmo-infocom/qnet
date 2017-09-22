@@ -157,12 +157,12 @@ class KeyManager(object):
             self.keys[self.cur_key].curpos = 0
             self.cur_key += 1
             kl = len(self.keys)
-            if kl > 20:
-                self.keys = self.keys[10:]
+            #if kl > 20:
+                #self.keys = self.keys[10:]
             if self.cur_key >= len(self.keys):
-                if len(self.keys) > 15:
-                    self.cur_key = 10
-                else:
+                #if len(self.keys) > 15:
+                    #self.cur_key = 10
+                #else:
                     self.cur_key = 0
             if self.keys[self.cur_key].ready:
                 self.keys[self.cur_key].curpos = 0
@@ -196,19 +196,19 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         request_path = self.path
 
-        print("\n----- Request Start ----->\n")
-        print(request_path)
+        #print("\n----- Request Start ----->\n")
+        #print(request_path)
 
         request_headers = self.headers
         content_length = request_headers.getheaders('content-length')
         length = int(content_length[0]) if content_length else 0
 
-        print(request_headers)
+        #print(request_headers)
         data = self.rfile.read(length)
-        print(data)
-        print(len(data))
+        #print(data)
+        #print(len(data))
         self.key_manager.read_keys(0, data.strip())
-        print("<----- Request End -----\n")
+        #print("<----- Request End -----\n")
 
         self.send_response(200)
         self.key_manager.print_keys()
