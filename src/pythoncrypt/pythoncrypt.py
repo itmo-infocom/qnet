@@ -119,8 +119,8 @@ class Key(object):
         self.curpos = 0
         self.ready = True
 
-class KeyManager(object, is_fpga):
-    def __init__(self):
+class KeyManager(object):
+    def __init__(self, is_fpga):
         self.buffer_size = 2048
         if is_fpga:
             self.block_size = 768
