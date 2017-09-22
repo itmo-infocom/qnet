@@ -131,7 +131,7 @@ class KeyManager(object):
     def read_keys(self, work_mode, array):
         #self.keys = []
         #self.count = 0
-        if len(array) > self.block_size:
+        if (len(array) > self.block_size) and (self.cur_key < 0):
             self.cur_key = 0
         if work_mode == 0:
             while len(array) > self.block_size:
@@ -156,14 +156,14 @@ class KeyManager(object):
         if self.cur_key > -1:
             self.keys[self.cur_key].curpos = 0
             self.cur_key += 1
-            kl = len(self.keys)
+            #kl = len(self.keys)
             #if kl > 20:
                 #self.keys = self.keys[10:]
             if self.cur_key >= len(self.keys):
                 #if len(self.keys) > 15:
                     #self.cur_key = 10
                 #else:
-                    self.cur_key = 0
+                self.cur_key = 0
             if self.keys[self.cur_key].ready:
                 self.keys[self.cur_key].curpos = 0
                 return self.keys[self.cur_key]
@@ -211,7 +211,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         #print("<----- Request End -----\n")
 
         self.send_response(200)
-        self.key_manager.print_keys()
+        #self.key_manager.print_keys()
 
     do_PUT = do_POST
     do_DELETE = do_GET
@@ -446,17 +446,17 @@ if __name__ == '__main__':
     mode = int(parser.get('default', 'mode'))
     coder = int(parser.get('default', 'coder'))
     port = int(parser.get('default', 'port'))
-    is_fpga = int(parser.get('default', 'isFpga'));
-    packet_size = int(parser.get('default', 'packetSize'));
+    isfpga = int(parser.get('default', 'isFpga'));
+    packetsize = int(parser.get('default', 'packetSize'));
     portCtrl = int(parser.get('default', 'portCtrl'))
     portDest = int(parser.get('default', 'portDest'))
     ip = parser.get('default', 'ip').replace('"', '')
 
-    manager = KeyManager(packet_size=packet_size)
+    manager = KeyManager(packet_size=packetsize)
 
     server = Proxy(listen_address=('0.0.0.0', port),
                    target_address=(ip, portDest),
-                   codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=is_fpga == 1),
+                   codec=Codec(key_manager=manager, first_slot=coder == 1, is_fpga=isfpga == 1),
                    work_mode=mode,
                    is_coder=coder == 1)
     control = Control('0.0.0.0', portCtrl, manager)
