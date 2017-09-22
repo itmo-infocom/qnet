@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import socket
 import select
 import sys
@@ -132,12 +133,12 @@ class KeyManager(object):
 
     def read_keys(self, work_mode, array):
         #self.keys = []
-        #self.cur_key = -1
         #self.count = 0
         if work_mode == 0:
             while len(array) > self.block_size:
                 self.keys.append(Key(array[:self.block_size]))
                 array = array[self.block_size:]
+                self.cur_key = 0
                 #self.count += 1
 
     def print_keys(self):
@@ -149,7 +150,7 @@ class KeyManager(object):
     def current_key(self):
         if self.cur_key > -1:
             if self.cur_key > len(self.keys):
-                self.cur_key = 0 
+                self.cur_key = 0
             return self.keys[self.cur_key]
         return None
 
