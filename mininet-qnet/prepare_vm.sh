@@ -1,8 +1,10 @@
 #!/bin/bash
-for i in openvswitch stunnel ryu mininet python-daemon squid tcpmux qcrypt qcrypt-fake-keys KeyByCURL of-qnet; do
+for i in openvswitch stunnel ryu mininet python-daemon squid tcpmux qcrypt qcrypt-fake-keys KeyByCURL of-qnet python2-pip; do
    echo installing $i
    yum install $i -y
 done
+
+pip install nifpga
 
 PEM_FILE=/etc/stunnel/stunnel.pem
 if [ ! -f $PEM_FILE ]; then

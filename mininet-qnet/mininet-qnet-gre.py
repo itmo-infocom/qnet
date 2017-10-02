@@ -9,50 +9,9 @@ from mininet.cli import CLI
 from mininet.node import Host, Node
 from mininet.util import ensureRoot, waitListening
 from os import path
-prefix = path.dirname(sys.argv[0])
+from mininet_common import connectToRootNS, sshd
+prefix = path.dirname(sys.argv[0]) if len(path.dirname(sys.argv[0]))!=0 else '.'
 
-cmd='/usr/sbin/sshd'
-
-def connectToRootNS( network, switch, ip, routes ):
-    """Connect hosts to root namespace via switch. Starts network.
-      network: Mininet() network object
-      switch: switch to connect to root namespace
-      ip: IP address for root namespace node
-      routes: host networks to route to"""
-    # Create a node in root namespace and link to switch 0
-    root = Node( 'root', inNamespace=False )
-    intf = network.addLink( root, switch ).intf1
-    root.setIP( ip, intf=intf )
-    # Start network that now includes link to root namespace
-    network.start()
-    # Add routes from root ns to hosts
-    for route in routes:
-        root.cmd( 'route add -net ' + route + ' dev ' + str( intf ) )
-        root.cmd( 'ip link set mtu 1400 dev '+str(intf) )
-
-def sshd( network, cmd='/usr/sbin/sshd', opts='-D -o UseDNS=no -u0',
-          ip='10.123.123.1/32', routes=None, switch=None ):
-    """Start a network, connect it to root ns, and run sshd on all hosts.
-       ip: root-eth0 IP address in root namespace (10.123.123.1/32)
-       routes: Mininet host networks to route to (10.0/24)
-       switch: Mininet switch to connect to root namespace (s1)"""
-    if not routes:
-        routes = [ '10.0.0.0/24' ]
-    if switch is not None:
-        print('connect host to mininet network')
-        connectToRootNS( network, switch, ip, routes )
-    for host in network.hosts:
-        host.cmd( cmd + ' ' + opts + '&' )
-    print( "*** Waiting for ssh daemons to start" )
-    for server in network.hosts:
-        waitListening( server=server, port=22, timeout=5 )
-
-    print()
-    print( "*** Hosts are running sshd at the following addresses:" )
-    print()
-    for host in network.hosts:
-        print( host.name, host.IP() )
-    print()
 
 if len(sys.argv)==3:
     if sys.argv[2] == 'host1':
@@ -70,10 +29,10 @@ else:
     sys.exit(1)
 
 
-def parse_controller(address_port):
-    return (address_port.split(':')[0],int(address_port.split(':')[1]))
+
 
 setLogLevel( 'info' )
+#setLogLevel( 'debug' )
 try:
     single_host = False
     if 'single_host' in config and config['single_host']:
@@ -89,6 +48,7 @@ try:
         hosts = config[hostn_]['hosts']
         controller = config[hostn_]['controller']
         port = config[hostn_]['port']
+        conf = config['conf'] if config['conf'][0]=='/' else path.join(prefix, config['conf'])
 
         c0 = RemoteController( 'c%s'%i, ip=controller, port=port )
         cmap[sw] = c0 
@@ -112,7 +72,7 @@ try:
             h = net.addHost( 'h%d' % n, ip = '10.0.0.%s'%n , mac ='00:00:00:00:00:%s'%(format(n, '02x')))
             net.addLink( s, h)
             h.cmd('ip link set mtu 1400 dev h%s-eth0'%n)
-    sshd(network=net, ip='10.0.0.10%s/8'%(hostn-1),switch=s)
+    sshd(network=net, ip='10.0.0.10%s/8'%(3-hostn),switch=s)
 
 
 
@@ -120,15 +80,10 @@ try:
     for host in net.hosts:
         i = int(host.name[1:])
         if i in (2,3,4,5):
-            stunnel_script = path.join(prefix, "scripts/scrypt-n%s.sh" %(i)) 
-            host.cmd('sh %s 1>/tmp/host-n%s-scrypt.log 2>&1 & '%(stunnel_script, i))
+	    host.cmd('/usr/bin/stunnel %s/stunnel-n%s.conf  & '%(conf,i))   
+            host.cmd('python %s/run_daemon.py start qcrypt_h%s python %s/pythoncrypt.py %s/qcrypt-n%s.cfg'%(prefix,i,prefix,conf,i))
+            host.cmd('python %s/run_daemon.py start transparent_h%s /bin/sh %s/transparent_n%s.cfg'%(prefix,i,conf,i))
 
-            trans_script = path.join(prefix, "scripts/transparent-n%s.sh" %(i)) 
-            host.cmd('sh %s 1>/tmp/host-n%s-trans.log 2>&1 & '%(trans_script, i))
-
-            qcrypt_script = path.join(prefix, "scripts/qcrypt-n%s.sh" %(i)) 
-            host.cmd('sh %s 1>/tmp/host-n%s-qcrypt.log 2>&1 & '%(qcrypt_script, i)) 
-   
     tunnels=config['tunnels']
     if single_host:
         for i in range(0,len(tunnels)):
@@ -158,7 +113,13 @@ try:
 except Exception as e:
     print 'exception', e
 finally:
-    
+    for host in net.hosts:
+        i = int(host.name[1:])
+        if i in (2,3,4,5):
+             host.cmd('python %s/run_daemon.py stop qcrypt_h%s'%(prefix,i))
+             host.cmd('python %s/run_daemon.py stop transparent_h%s'%(prefix,i))
+             host.cmd('python %s/run_daemon.py stop muxer_h%s'%(prefix,i))
+ 
     #remove processes on hosts
 
     for host in net.hosts:
