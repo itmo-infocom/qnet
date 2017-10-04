@@ -47,9 +47,8 @@ try:
     _intf = Intf( intfName, node=s )
 
     for n in hosts:
-        i=int(host.name[1:])
         h =  net.addHost( 'h%d' % n, ip='10.0.0.%s'%n, mac='00:00:00:00:00:%s'%(format(n,'02x')) )
-        net.addLink(s,h,port1=portmap[i])
+        net.addLink(s,h)
     sshd(network=net, ip='10.0.0.10%s/8'%(hostn-1),switch=s)
     net.build()
     net.start()
