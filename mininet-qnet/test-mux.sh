@@ -1,5 +1,5 @@
 #!/bin/sh
-debug=1
+debug=0
 if [ $debug -ne 0 ]; then
 flow1=/dev/stdout
 flow2=/dev/stderr
@@ -16,10 +16,10 @@ if [ -n "$1" ];
 then 
    TESTDATA="$1"
 else
-   TESTDATA="http://192.168.122.1/100k.dat"
+   TESTDATA="http://192.168.122.1/500k.dat"
 fi 
 
-curl -o /tmp/data.orig $TESTDATA 1>$flow1 2>$flow2
+ssh 10.0.0.1 "curl -o /tmp/data.orig --proxy 10.0.0.102:3128 $TESTDATA" 1>$flow1 2>$flow2
 
 RYUHOST=localhost
 DIR=`pwd`
@@ -95,7 +95,7 @@ test (){
              then
              STATUS="${RED}BAD${NC}"
         fi
-        diff /tmp/data /tmp/data.orig
+        ssh 10.0.0.1 "diff /tmp/data /tmp/data.orig" 1>$flow1 2>$flow2
         if [ $? -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
@@ -133,6 +133,7 @@ echo Quantum crypted channels
 curl http://${RYUHOST}:8080/qchannel/1/1  1>$flow1 2>$flow2
 curl http://${RYUHOST}:8080/qchannel/2/1  1>$flow1 2>$flow2
 test 3 qcrypt qcrypt
+
 
 echo SSL crypted channels
 curl http://${RYUHOST}:8080/qchannel/1/0  1>$flow1 2>$flow2

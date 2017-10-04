@@ -16,7 +16,7 @@ if [ -n "$1" ];
 then 
    TESTDATA="$1"
 else
-   TESTDATA="http://192.168.122.1/1.mp4"
+   TESTDATA="http://192.168.122.1/1G.dat"
 fi 
 
 #curl -o data.orig $TESTDATA 1>$flow1 2>$flow2
@@ -31,10 +31,11 @@ MODE=$1
 check_channel_mux (){
         c1="UNKNOWN"
         c2="UNKNOWN"
-        port1=$(cat /tmp/tcpdump-h2.log | sed 's/.* > 10.0.0.3.\(10[01][034]\).*/\1/' |head -5|uniq)
+        scp 10.0.0.2:/tmp/tcpdump-h2.log /tmp/tcpdump-h2.log.copy 1>$flow1 2>$flow2
+        port1=$(cat /tmp/tcpdump-h2.log.copy | sed 's/.* > 10.0.0.3.\(10[01][034]\).*/\1/' |head -5|uniq)
         echo $port1 1>$flow1 2>$flow2
-        scp 10.0.0.4:/tmp/tcpdump-h4.log /tmp/ 1>$flow1 2>$flow2
-        port2=$(cat /tmp/tcpdump-h4.log | sed 's/.* > 10.0.0.5.\(10[01][034]\).*/\1/' |head -5|uniq)
+        scp 10.0.0.4:/tmp/tcpdump-h4.log /tmp/tcpdump-h4.log.copy 1>$flow1 2>$flow2
+        port2=$(cat /tmp/tcpdump-h4.log.copy | sed 's/.* > 10.0.0.5.\(10[01][034]\).*/\1/' |head -5|uniq)
         echo $port2 1>$flow1 2>$flow2
 
         case $port1 in
@@ -121,6 +122,8 @@ echo Starting muxers
 sh run_muxers.sh start
 
 echo Running tests
+curl http://${RYUHOST}:8080/qchannel/1/3  1>$flow1 2>$flow2
+curl http://${RYUHOST}:8080/qchannel/2/3  1>$flow1 2>$flow2
 
 ssh 10.0.0.1 "rm -f data; curl --proxy 10.0.0.1:1000 $TESTDATA -o data " 1>$flow1 2>$flow2 &
 sleep 1
