@@ -23,7 +23,7 @@ try:
     intfName = config['intf']
     controller_ip = config['controller_ip']
     controller_port = config['controller_port']
-    conf = config['conf'] if config['conf'][0]=='/' else path.join(prefix, conf)
+    conf = config['conf'] if config['conf'][0]=='/' else path.join(prefix, config['conf'])
     checkIntf(intfName)
     if controller_ip is None:
         c0 = Controller( 'c%s'%hostn, port=controller_port )
