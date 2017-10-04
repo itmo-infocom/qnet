@@ -14,7 +14,7 @@ prefix = path.dirname(sys.argv[0]) if len(path.dirname(sys.argv[0]))!=0 else '.'
 
 setLogLevel( 'info' )
 #
-setLogLevel( 'debug' )
+#setLogLevel( 'debug' )
 
 try:
     exec(open(sys.argv[1]).read())
