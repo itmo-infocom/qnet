@@ -7,8 +7,8 @@ import signal
 class App():
     def __init__(self, command, pidfile, logfile):
         self.stdin_path = '/dev/null'
-        self.stdout_path = '/dev/tty'
-        self.stderr_path = '/dev/tty'
+        self.stdout_path = '/dev/console'
+        self.stderr_path = '/dev/console'
         self.pidfile_path =  pidfile
         self.pidfile_timeout = 5
         self.command = command

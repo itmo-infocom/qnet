@@ -32,7 +32,7 @@ else:
 
 
 setLogLevel( 'info' )
-#setLogLevel( 'debug' )
+setLogLevel( 'debug' )
 try:
     single_host = False
     if 'single_host' in config and config['single_host']:

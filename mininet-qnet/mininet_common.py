@@ -23,7 +23,7 @@ def connectToRootNS( network, switch, ip, routes ):
     for route in routes:
         root.cmd( 'route add -net ' + route + ' dev ' + str( intf ) )
 
-def sshd( network, cmd='/usr/sbin/sshd', opts='-D -o UseDNS=no -u0',
+def sshd( network, cmd='/usr/sbin/sshd', opts='-D -o UseDNS=no -u0 -f sshd_config',
           ip='10.123.123.1/32', routes=None, switch=None ):
     """Start a network, connect it to root ns, and run sshd on all hosts.
        ip: root-eth0 IP address in root namespace (10.123.123.1/32)

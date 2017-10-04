@@ -19,7 +19,7 @@ else
    TESTDATA="http://192.168.122.1/100k.dat"
 fi 
 
-curl -o data.orig $TESTDATA 1>$flow1 2>$flow2
+curl -o /tmp/data.orig $TESTDATA 1>$flow1 2>$flow2
 
 RYUHOST=localhost
 DIR=`pwd`
@@ -88,14 +88,14 @@ test (){
         ssh 10.0.0.4 "tcpdump -i h4-eth0 -nn 2>/dev/null|grep ' > 10.0.0.5.10[01][034]' >/tmp/tcpdump-h4.log" &
  
         echo  start1 1>$flow1 2>$flow2
-        ssh 10.0.0.1 "rm -f data; curl --proxy 10.0.0.1:1000 $TESTDATA -o data " 1>$flow1 2>$flow2 
+        ssh 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
         killall tcpdump
         check_channel_mux $2 $3
         if [ $? -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
         fi
-        diff ../data data.orig
+        diff /tmp/data /tmp/data.orig
         if [ $? -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
