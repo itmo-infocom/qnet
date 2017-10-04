@@ -3,6 +3,8 @@ from mininet.node import Node
 from mininet.util import quietRun
 from mininet.link import Intf
 from mininet.util import ensureRoot, waitListening
+from mininet.log import info, error
+
 import re
 
 cmd='/usr/sbin/sshd'

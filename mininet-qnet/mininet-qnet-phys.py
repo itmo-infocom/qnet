@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+import traceback
 from mininet_common import sshd, checkIntf
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController, OVSSwitch, Controller
@@ -14,7 +14,7 @@ prefix = path.dirname(sys.argv[0]) if len(path.dirname(sys.argv[0]))!=0 else '.'
 
 setLogLevel( 'info' )
 #
-# setLogLevel( 'debug' )
+setLogLevel( 'debug' )
 
 try:
     exec(open(sys.argv[1]).read())
@@ -61,8 +61,8 @@ try:
             host.cmd('python %s/run_daemon.py start qcrypt_h%s python %s/pythoncrypt.py %s/qcrypt-n%s.cfg'%(prefix,i,prefix,conf,i))
             host.cmd('python %s/run_daemon.py start transparent_h%s /bin/sh %s/transparent_n%s.cfg'%(prefix,i,conf,i))
     CLI(net)
-except Exception as e:
-    print 'exception', e
+except:
+    traceback.print_exc(file=sys.stdout)
 finally:
     for host in net.hosts:
         i = int(host.name[1:])
