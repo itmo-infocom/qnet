@@ -49,7 +49,7 @@ try:
     for n in hosts:
         h =  net.addHost( 'h%d' % n, ip='10.0.0.%s'%n, mac='00:00:00:00:00:%s'%(format(n,'02x')) )
         net.addLink(s,h)
-    sshd(network=net, ip='10.0.0.10%s/8'%(hostn-1),switch=s)
+    sshd(network=net, ip='10.0.0.%s/8'%(100+hostn-1),switch=s, host=str(hostn))
     net.build()
     net.start()
 
