@@ -1,7 +1,9 @@
-config = { 'hostn': 3,
-           'hosts': [5,],
-           'intf' : 'eno1',
-           'controller_ip' : None,
-           'controller_port': 6633,
-           'conf': 'conf'
+config = { 
+           'controllers' : {'c0': (None,6633)},
+           'switches' : {'s3':'c0'},
+           'hosts': ['h5',],
+           'phys' : ['eno1',],
+           'links' : [('s3','h5'),('s3','eno1')],
+           'conf' : 'conf',
+           'rootns' : {'s3':'10.0.0.102/8'}
          }
