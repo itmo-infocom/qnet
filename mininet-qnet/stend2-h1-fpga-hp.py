@@ -1,5 +1,5 @@
 config = {
-           'controllers': {'c0': ('192.168.244.243',6634),},
+           'controllers': {'c0': ('192.168.244.243',6633),},
            'switches' : {'s1':'c0',},
            'hosts': ['h1','h2'],
            'phys': ['ens33',],
