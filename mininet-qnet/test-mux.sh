@@ -19,7 +19,9 @@ else
    TESTDATA="http://192.168.122.1/100k.dat"
 fi 
 
-ssh 10.0.0.1 "curl -o /tmp/data.orig --proxy 10.0.0.102:3128 $TESTDATA" 1>$flow1 2>$flow2
+SSHOPT="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+ssh $SSHOPT 10.0.0.1 "curl -o /tmp/data.orig --proxy 10.0.0.102:3128 $TESTDATA" 1>$flow1 2>$flow2
 
 RYUHOST=localhost
 DIR=`pwd`
@@ -32,10 +34,10 @@ check_channel_mux (){
         c1="UNKNOWN"
         c2="UNKNOWN"
         rm -f /tmp/tcpdump_h?.log.copy
-        scp 10.0.0.2:/tmp/tcpdump-h2.log /tmp/tcpdump-h2.log.copy 1>$flow1 2>$flow2
+        scp $SSHOPT 10.0.0.2:/tmp/tcpdump-h2.log /tmp/tcpdump-h2.log.copy 1>$flow1 2>$flow2
         port1=$(cat /tmp/tcpdump-h2.log.copy | sed 's/.* > 10.0.0.3.\(10[01][034]\).*/\1/' |head -5|uniq)
         echo $port1 1>$flow1 2>$flow2
-        scp 10.0.0.4:/tmp/tcpdump-h4.log /tmp/tcpdump-h4.log.copy 1>$flow1 2>$flow2
+        scp $SSHOPT 10.0.0.4:/tmp/tcpdump-h4.log /tmp/tcpdump-h4.log.copy 1>$flow1 2>$flow2
         port2=$(cat /tmp/tcpdump-h4.log.copy | sed 's/.* > 10.0.0.5.\(10[01][034]\).*/\1/' |head -5|uniq)
         echo $port2 1>$flow1 2>$flow2
 
@@ -84,26 +86,26 @@ check_channel_mux (){
 test (){
 	STATUS="${GREEN}OK${NC}"
         echo  start 1>$flow1 2>$flow2
-        ssh 10.0.0.2 "tcpdump -i h2-eth0 -nn 2>/dev/null|grep ' > 10.0.0.3.10[01][034]' >/tmp/tcpdump-h2.log" &
-        ssh 10.0.0.4 "tcpdump -i h4-eth0 -nn 2>/dev/null|grep ' > 10.0.0.5.10[01][034]' >/tmp/tcpdump-h4.log" &
+        ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn 2>/dev/null|grep ' > 10.0.0.3.10[01][034]' >/tmp/tcpdump-h2.log" 1>$flow1 2>$flow2 & 
+        ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn 2>/dev/null|grep ' > 10.0.0.5.10[01][034]' >/tmp/tcpdump-h4.log" 1>$flow1 2>$flow2 &
  
         echo  start1 1>$flow1 2>$flow2
-        ssh 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
-        ssh 10.0.0.2 "killall tcpdump"
-        ssh 10.0.0.4 "killall tcpdump"
+        ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
+        ssh $SSHOPT 10.0.0.2 "killall tcpdump" 1>$flow1 2>$flow2
+        ssh $SSHOPT 10.0.0.4 "killall tcpdump" 1>$flow1 2>$flow2
 #        kill %1 %2 1>$flow1 2>$flow2
         check_channel_mux $2 $3
         if [ $? -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
         fi
-        ssh 10.0.0.1 "diff /tmp/data /tmp/data.orig" 1>$flow1 2>$flow2
+        ssh $SSHOPT 10.0.0.1 "diff /tmp/data /tmp/data.orig" 1>$flow1 2>$flow2
         if [ $? -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
         fi
 
-        ssh 10.0.0.1 "killall curl" 1>$flow1 2>$flow2
+        ssh $SSHOPT 10.0.0.1 "killall curl" 1>$flow1 2>$flow2
 	echo -e STATUS=$STATUS
 	echo
 	if [ "$MODE" = i -o "$MODE" = '-i' ]
@@ -122,7 +124,7 @@ echo Loading keys
 sh load_keys-python.sh 1>$flow1 2>$flow2
 
 echo Starting muxers
-sh run_muxers.sh start
+sh run_muxers.sh start 1>$flow1 2>$flow2
 
 echo Running tests
 # test 1
