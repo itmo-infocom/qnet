@@ -90,6 +90,7 @@ test (){
         echo  start1 1>$flow1 2>$flow2
         ssh 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
         killall tcpdump
+        kill %1 %2 1>$flow1 2>$flow2
         check_channel_mux $2 $3
         if [ $? -ne 0 ]
              then
