@@ -16,7 +16,7 @@ if [ -n "$1" ];
 then 
    TESTDATA="$1"
 else
-   TESTDATA="http://192.168.122.1/500k.dat"
+   TESTDATA="http://192.168.122.1/100k.dat"
 fi 
 
 ssh 10.0.0.1 "curl -o /tmp/data.orig --proxy 10.0.0.102:3128 $TESTDATA" 1>$flow1 2>$flow2
@@ -89,8 +89,9 @@ test (){
  
         echo  start1 1>$flow1 2>$flow2
         ssh 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
-        killall tcpdump
-        kill %1 %2 1>$flow1 2>$flow2
+        ssh 10.0.0.2 "killall tcpdump"
+        ssh 10.0.0.4 "killall tcpdump"
+#        kill %1 %2 1>$flow1 2>$flow2
         check_channel_mux $2 $3
         if [ $? -ne 0 ]
              then
