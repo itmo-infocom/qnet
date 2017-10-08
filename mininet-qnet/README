@@ -15,7 +15,7 @@ ryu-manager --verbose ryu.app.ofctl_rest ryu.app.qcrypt
 
 2. run mininet 
 
-python mininet-qnet-nomux.py config-1h.py host1
+python mininet-qnet.py config-file.py
 
  - initializes all hosts with IP's in 10.0.0.0/24 network
  - starts sshd for each host  (one can ssh to each host for debugging)
@@ -26,6 +26,9 @@ nodes renubered from (1,3,4,5,2) to (1,2,3,4,5)
  - starts mininet CLI (exit from CLI will remove mininet network from the VM and stops all launched processes on mininet host)
 
 3. launch tests
-sh test-nomux.sh
+sh test-mux.sh
+
+in case of abnormal termination run:
+sh run_muxers.sh stop
 
 
