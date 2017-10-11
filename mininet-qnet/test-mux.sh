@@ -1,7 +1,7 @@
 #!/bin/sh
 PREFIX=$(dirname $(realpath $0))
 
-debug=1
+debug=0
 if [ $debug -ne 0 ]; then
 flow1=/dev/stdout
 flow2=/dev/stderr

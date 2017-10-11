@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/bin/bash
 
 PREFIX=$(dirname $(realpath $0))
 action=$1
