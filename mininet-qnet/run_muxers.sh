@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-PREFIX=`echo $0|sed 's|/run_muxers.sh|/|'`
+PREFIX=$(dirname $(realpath $0))
 action=$1
 SSHOPT="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 ssh $SSHOPT 10.0.0.5 "python ${PREFIX}/run_daemon.py $action muxer_h5 /usr/bin/tcpmux --demux 10.0.0.5:1010 10.0.0.102:3128"

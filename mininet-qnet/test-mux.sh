@@ -1,7 +1,7 @@
 #!/bin/sh
-PREFIX=`echo $0|sed 's|/test-mux.sh|/|'`
+PREFIX=$(dirname $(realpath $0))
 
-debug=0
+debug=1
 if [ $debug -ne 0 ]; then
 flow1=/dev/stdout
 flow2=/dev/stderr
