@@ -138,7 +138,7 @@ test 2 transparent transparent
 echo Quantum crypted channels
 curl http://${RYUHOST}:8080/qchannel/1/1  1>$flow1 2>$flow2
 curl http://${RYUHOST}:8080/qchannel/2/1  1>$flow1 2>$flow2
-#test 3 qcrypt qcrypt
+test 3 qcrypt qcrypt
 
 
 echo SSL crypted channels
