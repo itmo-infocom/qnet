@@ -8,6 +8,6 @@ flow2=/dev/stderr
 
 
 echo loading keys
-./KeyByCURL.out 127.0.0.1:8080/qkey/1  1>$flow1 2>$flow2
-./KeyByCURL.out 127.0.0.1:8080/qkey/2  1>$flow1 2>$flow2
+/usr/bin/KeyByCURL.out 127.0.0.1:8080/qkey/1  1>$flow1 2>$flow2
+/usr/bin/KeyByCURL.out 127.0.0.1:8080/qkey/2  1>$flow1 2>$flow2
 
