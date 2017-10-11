@@ -1,4 +1,6 @@
 #!/bin/sh
+PREFIX=`echo $0|sed 's|/test-mux.sh|/|'`
+
 debug=0
 if [ $debug -ne 0 ]; then
 flow1=/dev/stdout
@@ -121,10 +123,10 @@ curl http://${RYUHOST}:8080/qchannel/1/4 1>$flow1 2>$flow2
 curl http://${RYUHOST}:8080/qchannel/2/4 1>$flow1 2>$flow2
 
 echo Loading keys
-sh load_keys-python.sh 1>$flow1 2>$flow2
+sh $PREFIX/load_keys-python.sh 1>$flow1 2>$flow2
 
 echo Starting muxers
-sh run_muxers.sh start 1>$flow1 2>$flow2
+sh $PREFIX/run_muxers.sh start 1>$flow1 2>$flow2
 
 echo Running tests
 # test 1
@@ -136,7 +138,7 @@ test 2 transparent transparent
 echo Quantum crypted channels
 curl http://${RYUHOST}:8080/qchannel/1/1  1>$flow1 2>$flow2
 curl http://${RYUHOST}:8080/qchannel/2/1  1>$flow1 2>$flow2
-test 3 qcrypt qcrypt
+#test 3 qcrypt qcrypt
 
 
 echo SSL crypted channels
@@ -169,7 +171,7 @@ curl http://${RYUHOST}:8080/qchannel/1/1  1>$flow1 2>$flow2
 curl http://${RYUHOST}:8080/qchannel/2/0  1>$flow1 2>$flow2
 test 1 qcrypt scrypt
 
-sh run_muxers.sh stop 1>$flow1 2>$flow2
+sh $PREFIX/run_muxers.sh stop 1>$flow1 2>$flow2
 
 echo Flow tables clearing
 curl http://${RYUHOST}:8080/qchannel/1/4  1>$flow1 2>$flow2
