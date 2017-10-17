@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in openvswitch stunnel ryu mininet python-daemon squid tcpmux KeyByCURL of-qnet pythoncrypti httpd; do
+for i in openvswitch stunnel ryu mininet python-daemon squid tcpmux KeyByCURL of-qnet pythoncrypt httpd; do
    echo installing $i
    yum install $i -y
 done
