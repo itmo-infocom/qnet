@@ -74,7 +74,7 @@ try:
         i=int(host.name[1:])
         if i in (2,3,4,5):
 	    host.cmd('/usr/bin/stunnel %s/stunnel-n%s.conf  & '%(conf,i))   
-            host.cmd('python %s/run_daemon.py start qcrypt_h%s python /usr/bin/pythoncrypt %s/qcrypt-n%s.cfg'%(prefix,i,prefix,conf,i))
+            host.cmd('python %s/run_daemon.py start qcrypt_h%s python /usr/bin/pythoncrypt %s/qcrypt-n%s.cfg'%(prefix,i,conf,i))
             host.cmd('python %s/run_daemon.py start transparent_h%s /bin/sh %s/transparent_n%s.cfg'%(prefix,i,conf,i))
     CLI(net)
 except:
