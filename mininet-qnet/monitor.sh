@@ -84,7 +84,7 @@ test (){
         ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn 2>/dev/null|grep ' > 10.0.0.5.10[01][034]' >/tmp/tcpdump-h4.log" 1>$flow1 2>$flow2 &
  
         echo  start1 1>$flow1 2>$flow2
-        ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
+        ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl -m 10 --proxy 10.0.0.1:1000 $TESTDATA -o /tmp/data " 1>$flow1 2>$flow2 
         ssh $SSHOPT 10.0.0.2 "killall tcpdump" 1>$flow1 2>$flow2
         ssh $SSHOPT 10.0.0.4 "killall tcpdump" 1>$flow1 2>$flow2
 #        kill %1 %2 1>$flow1 2>$flow2
