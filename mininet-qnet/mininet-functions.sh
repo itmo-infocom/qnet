@@ -8,6 +8,10 @@ NC='\033[0m'
 
 SSHOPT="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
+#flow1=/dev/stdout
+#flow2=/dev/stderr
+
+
 
 port_to_name (){
         local c1;
@@ -59,10 +63,10 @@ set_debug_output () {
 }
 
 check_channels_passive (){       
-        port1=$(ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 5 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null| sed 's/.* > 10.0.0.3.\(10[01][034]\):.*/\1/' |uniq" 2>$flow2)
-        echo $port1 1>$flow1 2>$flow2
-        port2=$(ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 5 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null| sed 's/.* > 10.0.0.5.\(10[01][034]\):.*/\1/' |uniq" 2>$flow2)
-        echo  $port2 1>$flow1 2>$flow2
+        port1=$(ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 5 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null| sed 's/.* > 10.0.0.3.\(10[01][034]\):.*/\1/' |uniq")
+        echo $port1
+        port2=$(ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 5 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null| sed 's/.* > 10.0.0.5.\(10[01][034]\):.*/\1/' |uniq")
+        echo  $port2 
 
         c1=$(port_to_cname $port1)
         c2=$(port_to_cname $port2)
@@ -78,9 +82,9 @@ echo_date (){
         echo -n "$(date '+%Y-%m-%d %H:%M:%S ')"
 }
 check_channels_active () {
-        ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 5 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h2-tcpdump.log 2>$flow2 &
-        ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 5 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h4-tcpdump.log 2>$flow2 &
-        ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl -m 10 --proxy 10.0.0.1:1000 $1 -o /tmp/data " 1>$flow1 2>$flow2 
+        ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 5 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h2-tcpdump.log 2>$flow2&
+        ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 5 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h4-tcpdump.log 2>$flow2&
+        ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl -m 10 --proxy 10.0.0.1:1000 $1 -o /tmp/data "  1>$flow1 2>$flow2
         kill %1 1>$flow1 2>$flow2
         kill %2 1>$flow1 2>$flow2
         port1=$(cat /tmp/h2-tcpdump.log| sed 's/.* > 10.0.0.3.\(10[01][034]\):.*/\1/' |uniq )
@@ -134,3 +138,4 @@ stop_muxers (){
     sh ${PREFIX}/run_muxers.sh stop 1>$flow1 2>$flow2
     exit
 }
+
