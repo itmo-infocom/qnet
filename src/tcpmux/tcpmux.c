@@ -54,6 +54,8 @@ static int get_time() {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000; /* Overflow is OK here. */
 }
 
+long long time_last;
+
 static int setnonblocking(int s) {
   assert(s != -1);
 
@@ -82,7 +84,7 @@ static int socket_connected(int s) {
 int main(int argc, char** argv) {
   srand(time(NULL));
   signal(SIGPIPE, SIG_IGN);
-
+  time_last = get_time();
   char* str;
   int demux = 0;
   int retry_dns = 0;
@@ -294,9 +296,11 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-
-  res = muxloop(sserv, demux, caddrinfo, sctl);
-  fprintf(stderr, "mux loop unexpectedly exited\n");
+  res = 1;
+  while(res){
+  	res = muxloop(sserv, demux, caddrinfo, sctl);
+  	fprintf(stderr, "mux loop unexpectedly exited\n");
+  }
   return res;
 }
 
@@ -673,14 +677,19 @@ static ssize_t write_mainfd(mux_context* mc, const void* buf, size_t count) {
   return amt;
 }
 
-static void read_ack(mux_context* mc) {
+static int read_ack(mux_context* mc) {
   VVLOG("Reading ACK");
 
   int* data = (int*)mc->rin.buf;
   int* edata = (int*)(mc->rin.buf + mc->rin.sz);
   mc->stream_karma += ntohl(*data++);
   // TODO: Shouldn't be an assert.
-  assert(0 <= mc->stream_karma && mc->stream_karma <= GLOBAL_KARMA);
+  if(0 <= mc->stream_karma && mc->stream_karma <= GLOBAL_KARMA){
+	
+  }else{
+	return 1;
+  }
+
   for(; data + 2 <= edata; ) {
     int id = ntohl(*data++);
     int karma = ntohl(*data++);
@@ -717,6 +726,7 @@ static void read_ack(mux_context* mc) {
       }
     }
   }
+  return 0;
 }
 
 static void write_ack(mux_context* mc) {
@@ -862,7 +872,9 @@ static int mainr(mux_context* mc) {
       /* Got a packet!  Time to process it... */
       if(mc->rin.id == -1) {
         /* It's a control packet. */
-        read_ack(mc);
+        if(read_ack(mc)){
+		return 1;
+	}
       } else {
         client_data* cd = get_client(mc, mc->rin.id, 0);
         if(!cd) return 1;
@@ -1099,7 +1111,7 @@ static int muxloop(int sserv, int demux, struct addrinfo* caddrinfo,
   }
 
   while(1) {
-    int nfds = epoll_wait(epollfd, events, MAX_EVENTS, MUX_TIMEOUT);
+    int nfds = epoll_wait(epollfd, events, MAX_EVENTS, 100);
     if(nfds == -1) {
       if(errno == EINTR) {
         /* This is for testing purposes only. */
@@ -1115,6 +1127,17 @@ static int muxloop(int sserv, int demux, struct addrinfo* caddrinfo,
       return 1;
     }
     long long time_now = get_time();
+
+    if(nfds==0&&time_now-time_last>300){
+	mux_context* mc = context_list;
+        if(mc) do {
+          disconnect_main(mc);
+          mc = mc->next_context;
+        } while(mc != context_list);
+    	time_last = time_now;
+    }else
+    if(nfds>0)
+    	time_last = time_now;
 
     struct epoll_event* ei,* ee;
     for(ei = events, ee = events + nfds; ei != ee; ++ei) {
