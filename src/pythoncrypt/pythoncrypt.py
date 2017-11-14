@@ -4,6 +4,7 @@ import select
 import sys
 import threading
 import struct
+import numpy
 from ConfigParser import ConfigParser
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from nifpga import Session
@@ -27,6 +28,11 @@ class Codec(object):
                 self.output = self.session.registers['Output2']
                 self.irq = 2
 
+    def faster_slow_xor(self,aa,bb):
+        b = numpy.array(bb)
+        numpy.bitwise_xor(numpy.array(aa), b, b)
+        return b.tolist()
+                
     def xor(self, v1, v2):
         result = []
         if self.is_fpga:
@@ -37,9 +43,7 @@ class Codec(object):
                 data = self.output.read()
                 return data
         else:
-            for x in range(0, len(v1)):
-                result.append(v1[x] ^ v2[x])
-            return result
+            return faster_slow_xor(v1, v2)
         return None
 
     def encode(self, data):
