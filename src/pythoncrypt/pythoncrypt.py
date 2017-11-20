@@ -32,7 +32,7 @@ class Codec(object):
         b = numpy.array(bb)
         numpy.bitwise_xor(numpy.array(aa), b, b)
         return b.tolist()
-                
+
     def xor(self, v1, v2):
         result = []
         if self.is_fpga:
@@ -43,7 +43,7 @@ class Codec(object):
                 data = self.output.read()
                 return data
         else:
-            return faster_slow_xor(v1, v2)
+            return self.faster_slow_xor(v1, v2)
         return None
 
     def encode(self, data):
@@ -142,6 +142,7 @@ class KeyManager(object):
                 self.keys.append(Key(array[:self.block_size]))
                 array = array[self.block_size:]
                 #self.count += 1
+            print "KEYS: "+str(len(self.keys))
 
     def print_keys(self):
         for key in self.keys:
