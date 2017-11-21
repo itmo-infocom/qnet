@@ -8,7 +8,7 @@ if [ -n "$1" ];
 then 
    TESTDATA="$1"
 else
-   TESTDATA="http://192.168.122.1/100k.dat"
+   TESTDATA="http://192.168.122.1/10k.dat"
 fi 
 
 
