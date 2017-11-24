@@ -22,23 +22,33 @@ RYUHOST=localhost
 
 
 test (){
-        sleep 1
+        sleep 5
 	STATUS="${GREEN}OK${NC}"
         echo  start 1>$flow1 2>$flow2
-        res=$(check_channels_active $TESTDATA $1 $2) 
+        ret=1
+        for i in $(seq 10); do
 
-        if [ $? -ne 0 ]
-             then
-             STATUS="${RED}BAD${NC}"
-        fi
-        ssh $SSHOPT 10.0.0.1 "diff /tmp/data /tmp/data.orig" 1>$flow1 2>$flow2
-        if [ $? -ne 0 ]
+#            res=$(check_channels_active $TESTDATA $1 $2) 1>$flow1 2>$flow2
+            check_channels_active $TESTDATA $1 $2 1>/tmp/res.txt 2>$flow2
+            ret1=$?
+            echo ret1  $ret1 1>$flow1 2>$flow2
+            ssh $SSHOPT 10.0.0.1 "diff /tmp/data /tmp/data.orig" 1>$flow1 2>$flow2
+            ret2=$?
+            echo ret2 $ret2 1>$flow1 2>$flow2
+            if [ $ret1 -eq 0 -a $ret2 -eq 0 ]; then ret=0;break; fi
+        done
+
+
+        if [ $ret -ne 0 ]
              then
              STATUS="${RED}BAD${NC}"
         fi
 
         ssh $SSHOPT 10.0.0.1 "killall curl" 1>$flow1 2>$flow2
-        echo -e $res
+#        echo_date
+        cat /tmp/res.txt
+#        echo -e $res
+        echo
        	echo -e STATUS=$STATUS
 }
 

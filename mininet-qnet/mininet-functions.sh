@@ -82,22 +82,36 @@ echo_date (){
         echo -n "$(date '+%Y-%m-%d %H:%M:%S ')"
 }
 check_channels_active () {
-        ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 5 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h2-tcpdump.log 2>$flow2&
-        ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 5 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h4-tcpdump.log 2>$flow2&
+        ssh $SSHOPT 10.0.0.2 "tcpdump -i h2-eth0 -nn  -l -c 10 'ip src host 10.0.0.2 and  dst host 10.0.0.3 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h2-tcpdump.log 2>$flow2&
+        ssh $SSHOPT 10.0.0.4 "tcpdump -i h4-eth0 -nn  -l -c 10 'ip src host 10.0.0.4 and  dst host 10.0.0.5 and (port 1000 or 1003 or 1004) and tcp[tcpflags] & (tcp-syn|tcp-fin) = 0' 2>/dev/null" >/tmp/h4-tcpdump.log 2>$flow2&
         ssh $SSHOPT 10.0.0.1 "rm -f /tmp/data; curl -m 10 --proxy 10.0.0.1:1000 $1 -o /tmp/data "  1>$flow1 2>$flow2
         kill %1 1>$flow1 2>$flow2
         kill %2 1>$flow1 2>$flow2
+        cp /tmp/h2-tcpdump.log /tmp/h2-tcpdump.log.$2.$3
+        cp /tmp/h4-tcpdump.log /tmp/h4-tcpdump.log.$2.$3
+
         port1=$(cat /tmp/h2-tcpdump.log| sed 's/.* > 10.0.0.3.\(10[01][034]\):.*/\1/' |uniq )
         port2=$(cat /tmp/h4-tcpdump.log| sed 's/.* > 10.0.0.5.\(10[01][034]\):.*/\1/' |uniq)
         echo $port1 1>$flow1 2>$flow2
         echo $port2 1>$flow1 2>$flow2
-        echo -ne " channel 1: $(port_to_cname $port1), channel 2: $(port_to_cname $port2) " 
-        return $(check_ports $2 $3 $port1 $port2)
+        echo -ne "channel 1: $(port_to_cname $port1), channel 2: $(port_to_cname $port2) " 
+        check_ports $2 $3 "$port1" "$port2"
+        res=$?
+        echo checkports $res 1>$flow1 2>$flow2
+        return $res
+        
 }
 
 check_ports (){
         c1=$(port_to_name $3)
         c2=$(port_to_name $4)
+        cc1=$(echo "$3"|wc -l)
+        cc2=$(echo "$4"|wc -l)
+        echo $3 $cc1 $4 $cc2  1>$flow1 2>$flow2
+        if [ $cc1 -ne 1 -o $cc2 -ne 1 ]
+             then
+                  return 1
+        fi
         result=1
         if [ "x$c1" = "x$1" -a "x$c2" = "x$2" ]
              then
