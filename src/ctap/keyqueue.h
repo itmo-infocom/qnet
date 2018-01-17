@@ -7,7 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct KEY {
     uint8_t sha[32];
     uint8_t key[32];
     uint8_t usage;
@@ -22,11 +22,13 @@ typedef struct Queue {
 } Queue;
 
 KEY *ConstructKey(uint8_t *buf);
+KEY *ConstructKeyUsage(uint8_t *buf,uint8_t usage);
 Queue *ConstructQueue(int limit);
 void DestructQueue(Queue *queue);
 int Enqueue(Queue *pQueue, KEY *item);
 KEY *Dequeue(Queue *pQueue);
 KEY *CopyKey(KEY *k);
+void PrintKey(KEY *k);
 int isEmpty(Queue* pQueue);
 
 #ifdef __cplusplus

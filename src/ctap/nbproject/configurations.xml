@@ -3,12 +3,10 @@
   <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
     <df root="." name="0">
       <in>aes.c</in>
-      <in>aes.h</in>
       <in>ctap.c</in>
       <in>keyqueue.c</in>
-      <in>keyqueue.h</in>
+      <in>post_curl.c</in>
       <in>sha3.c</in>
-      <in>sha3.h</in>
     </df>
     <logicalFolder name="ExternalFiles"
                    displayName="Важные файлы"
@@ -46,17 +44,13 @@
       </makefileType>
       <item path="aes.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="aes.h" ex="false" tool="3" flavor2="0">
-      </item>
       <item path="ctap.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="keyqueue.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="keyqueue.h" ex="false" tool="3" flavor2="0">
+      <item path="post_curl.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="sha3.c" ex="false" tool="0" flavor2="0">
-      </item>
-      <item path="sha3.h" ex="false" tool="3" flavor2="0">
       </item>
     </conf>
   </confs>

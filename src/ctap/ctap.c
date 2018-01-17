@@ -1,24 +1,3 @@
-/**************************************************************************
- * simpletun.c *
- * *
- * A simplistic, simple-minded, naive tunnelling program using tun/tap *
- * interfaces and TCP. DO NOT USE THIS PROGRAM FOR SERIOUS PURPOSES.  *
- * *
- * You have been warned.  *
- * *
- * (C) 2010 Davide Brini.  *
- * *
- * DISCLAIMER AND WARNING: this is all work in progress. The code is *
- * ugly, the algorithms are naive, error checking and input validation *
- * are very basic, and of course there can be bugs. If that's not enough, *
- * the program has not been thoroughly tested, so it might even fail at *
- * the few simple things it should be supposed to do right.  *
- * Needless to say, I take no responsibility whatsoever for what the *
- * program might do. The program has been written mostly for learning *
- * purposes, and can be used in the hope that is useful, but everything *
- * is to be taken "as is" and without any kind of warranty, implicit or *
- * explicit. See the file LICENSE for further details.  *
- *************************************************************************/
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
@@ -40,12 +19,14 @@
 #include "sha3.h"
 #include "keyqueue.h"
 #include <microhttpd.h>
+#include <curl/curl.h>
+#include "post_curl.h"
 /* buffer for reading from tun/tap interface, must be >= 1500 */
 #define BUFSIZE 2000 
 #define CLIENT 0 
 #define SERVER 1 
 #define PORT 55555
-#define PORTC 55554
+#define PORTC 55553
 
 Queue *q1;
 Queue *q2;
@@ -249,6 +230,55 @@ void usage(void) {
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
+void getKeyBySha(uint8_t* sha);
+
+void getLastKey() {
+    char* nextkey = curl_get_key("last", true);
+    uint8_t buff[32];
+    if (nextkey != NULL) {
+        int i;
+        for (i = 0; i < 32; i++) {
+            sscanf(nextkey + i * 2, "%02X", &(buff[i]));
+        }
+        for (i = 0; i < 32; i++) {
+            printf("%02X", buff[i]);
+        }
+        printf("\n");
+        printf("NEWKEYOK\n");
+        KEY *k1 = ConstructKey(buff);
+        KEY *k2 = CopyKey(k1);
+        Enqueue(q1, k1);
+        Enqueue(q2, k2);
+    }
+}
+
+void getKeyBySha(uint8_t* sha) {
+    char qbuffer[67];
+    qbuffer[0] = 'k';
+    qbuffer[1] = 'e';
+    qbuffer[2] = 'y';
+    int i;
+    for (i = 0; i < 32; i++) {
+        sprintf(qbuffer + 3 + i * 2, "%02X", sha[i]);
+    }
+    char* nextkey = curl_get_key(qbuffer, true);
+    uint8_t buff[32];
+    if (nextkey != NULL) {
+        int i;
+        for (i = 0; i < 32; i++) {
+            sscanf(nextkey + i * 2, "%02X", &(buff[i]));
+        }
+        for (i = 0; i < 32; i++) {
+            printf("%02X", buff[i]);
+        }
+        printf("\n");
+        printf("NEWKEYBYSHAOK\n");
+        KEY *k1 = ConstructKey(buff);
+        KEY *k2 = CopyKey(k1);
+        Enqueue(q1, k1);
+        Enqueue(q2, k2);
+    }
+}
 
 int main(int argc, char *argv[]) {
     int tap_fd, option;
@@ -257,9 +287,11 @@ int main(int argc, char *argv[]) {
     int maxfd;
     uint16_t nread, nwrite, plength;
     char buffer[BUFSIZE];
-    struct sockaddr_in local, remote;
+    struct sockaddr_in local, remote, key_worker;
     char remote_ip[16] = ""; /* dotted quad IP string */
+    char key_ip[16] = ""; /* dotted quad IP string */
     unsigned short int port = PORT;
+    unsigned short int port_key = PORT;
     unsigned short int portCtrl = PORTC;
     int sock_fd, net_fd, optval = 1;
     socklen_t remotelen;
@@ -286,7 +318,7 @@ int main(int argc, char *argv[]) {
     q2 = ConstructQueue(100);
 
     /* Check command line options */
-    while ((option = getopt(argc, argv, "i:sc:p:uahd")) > 0) {
+    while ((option = getopt(argc, argv, "i:q:r:k:sc:p:uahd")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -303,6 +335,12 @@ int main(int argc, char *argv[]) {
             case 'c':
                 cliserv = CLIENT;
                 strncpy(remote_ip, optarg, 15);
+                break;
+            case 'q':
+                strncpy(key_ip, optarg, 15);
+                break;
+            case 'r':
+                port_key = atoi(optarg);
                 break;
             case 'p':
                 port = atoi(optarg);
@@ -337,6 +375,18 @@ int main(int argc, char *argv[]) {
         my_err("Must specify server address!\n");
         usage();
     }
+
+    memset(&key_worker, 0, sizeof (key_worker));
+    key_worker.sin_family = AF_INET;
+    key_worker.sin_addr.s_addr = inet_addr(key_ip);
+    key_worker.sin_port = htons(port_key);
+
+    char buffer_addr[30];
+    int len = sprintf(buffer_addr, "http://%s:%d", key_ip, port_key);
+    curl_init_addr(buffer_addr, len);
+    getLastKey();
+    //nextkey = curl_get_key("key5D56F45ED57EA8DC9CF62322849A36E8D563AE8C7E5A265CFD994213834B73A4",true);
+
     /* initialize tun/tap interface */
     if ((tap_fd = tun_alloc(if_name, flags | IFF_NO_PI)) < 0) {
         my_err("Error connecting to tun/tap interface %s!\n", if_name);
@@ -346,16 +396,16 @@ int main(int argc, char *argv[]) {
     if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket()");
         exit(1);
-    }    
+    }
 
     struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,
-               portCtrl,
-               NULL,
-               NULL,
-               &ahc_echo,
-               response_data,
-               MHD_OPTION_END);
-    
+            portCtrl,
+            NULL,
+            NULL,
+            &ahc_echo,
+            response_data,
+            MHD_OPTION_END);
+
     if (cliserv == CLIENT) {
         /* Client, try to connect to server */
         /* assign the destination address */
@@ -431,18 +481,32 @@ int main(int argc, char *argv[]) {
             } else {
                 diff = nread;
             }
-            if(curKey1 == NULL){
-                if(isEmpty(q1)){
-                    do_debug("No keys\n"); 
-                    continue;
-                }else{
+            if (curKey1 == NULL) {
+                if (isEmpty(q1)) {
+                    getLastKey();   
+                    if(isEmpty(q1)){
+                        do_debug("No keys\n");
+                        continue;
+                    }else{
+                        curKey1 = Dequeue(q1);
+                        do_debug("New key\n");                        
+                    }
+                } else {
                     curKey1 = Dequeue(q1);
-                    do_debug("New key\n");     
+                    do_debug("New key\n");
                 }
-            }else if(curKey1->usage>10){
+            } else if (curKey1->usage > 10) {
                 do_debug("%d usages of key\n", curKey1->usage);
-                if(!isEmpty(q1)){
-                    curKey1 = Dequeue(q1);                    
+                if (!isEmpty(q1)) {
+                    curKey1 = Dequeue(q1);
+                }else{
+                    getLastKey(); 
+                    if(isEmpty(q1)){
+                        do_debug("No keys, last usage\n");
+                    }else{
+                        curKey1 = Dequeue(q1);
+                        do_debug("New key\n");                        
+                    }                   
                 }
             }
             curKey1->usage++;
@@ -458,22 +522,39 @@ int main(int argc, char *argv[]) {
             /* data from the network: read it, and write it to the tun/tap interface.
              * We need to read the length first, and then the packet */
             /* Read length */
-            uint8_t buf[32];            
-            if(curKey2 == NULL){
-                if(isEmpty(q2)){
+            uint8_t buf[32];
+            if (curKey2 == NULL) {
+                if (isEmpty(q2)) {
                     continue;
-                }else{
+                } else {
                     curKey2 = Dequeue(q2);
                 }
             }
             nread = read_n(net_fd, buf, (sizeof (uint8_t))*32);
-            while(!memcmp(buf, curKey2->sha, sizeof(buf))){           
-                if(isEmpty(q2)){
-                    do_debug("No keys\n");           
-                    continue;
-                }else{
+            while (memcmp(buf, curKey2->sha, 32)!=0) {
+                if (isEmpty(q2)) {
+                    getKeyBySha(buf);
+                    int i;
+                    printf("\nSHAbuf:\n");
+                    for (i = 0; i < 32; i++) {
+                        printf("%02X", buf[i]);
+                    }
+                    printf("\n");
+                    printf("\nSHAcur:\n");
+                    for (i = 0; i < 32; i++) {
+                        printf("%02X", curKey2->sha[i]);
+                    }
+                    printf("\n");
+                    printf("GETNEW\n");
+                    if (isEmpty(q2)) {
+                        do_debug("No keys\n");
+                        sleep(1);
+                    }else{
+                        curKey2 = Dequeue(q2);                        
+                    }
+                } else {
                     curKey2 = Dequeue(q2);
-                    do_debug("New key\n");     
+                    do_debug("New key\n");
                 }
             }
             nread = read_n(net_fd, (char *) &plength, sizeof (plength));
@@ -500,7 +581,7 @@ int main(int argc, char *argv[]) {
             do_debug("NET2TAP %lu: Written %d bytes to the tap interface\n", net2tap, nwrite);
         }
     }
-    MHD_stop_daemon (daemon);
+    MHD_stop_daemon(daemon);
     DestructQueue(q1);
     DestructQueue(q2);
     return (0);

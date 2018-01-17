@@ -1,6 +1,4 @@
 all:
-	rm -rf ./build
-	mkdir ./build
-	cc -o ./build/ctap aes.c sha3.c keyqueue.c ctap.c -lmicrohttpd
+	cc -o ctap aes.c sha3.c keyqueue.c post_curl.c ctap.c -lmicrohttpd -lcurl
 clean:
-	rm -rf ./build
+	rm ctap
