@@ -205,15 +205,10 @@ void my_err(char *msg, ...) {
  **************************************************************************/
 void usage(void) {
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "%s -i <ifacename> [-s|-c <serverIP>] [-p <port>] [-k <port>] [-u|-a] [-d]\n", progname);
+    fprintf(stderr, "%s -p <port> \n", progname);
     fprintf(stderr, "%s -h\n", progname);
     fprintf(stderr, "\n");
-    fprintf(stderr, "-i <ifacename>: Name of interface to use (mandatory)\n");
-    fprintf(stderr, "-s|-c <serverIP>: run in server mode (-s), or specify server address (-c <serverIP>) (mandatory)\n");
-    fprintf(stderr, "-p <port>: port to listen on (if run in server mode) or to connect to (in client mode), default 55555\n");
-    fprintf(stderr, "-k <port>: port to listen keys, default 55554\n");
-    fprintf(stderr, "-u|-a: use TUN (-u, default) or TAP (-a)\n");
-    fprintf(stderr, "-d: outputs debug information while running\n");
+    fprintf(stderr, "-p <port>: port to listen on 55554\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
@@ -361,36 +356,14 @@ int main(int argc, char *argv[]) {
     q2 = ConstructQueue(100);
 
     /* Check command line options */
-    /*
-    while ((option = getopt(argc, argv, "i:sc:p:uahd")) > 0) {
+    
+    while ((option = getopt(argc, argv, "p:")) > 0) {
         switch (option) {
-            case 'd':
-                debug = 1;
-                break;
             case 'h':
                 usage();
                 break;
-            case 'i':
-                strncpy(if_name, optarg, IFNAMSIZ - 1);
-                break;
-            case 's':
-                cliserv = SERVER;
-                break;
-            case 'c':
-                cliserv = CLIENT;
-                strncpy(remote_ip, optarg, 15);
-                break;
             case 'p':
-                port = atoi(optarg);
-                break;
-            case 'k':
                 portCtrl = atoi(optarg);
-                break;
-            case 'u':
-                flags = IFF_TUN;
-                break;
-            case 'a':
-                flags = IFF_TAP;
                 break;
             default:
                 my_err("Unknown option %c\n", option);
@@ -403,16 +376,6 @@ int main(int argc, char *argv[]) {
         my_err("Too many options!\n");
         usage();
     }
-    if (*if_name == '\0') {
-        my_err("Must specify interface name!\n");
-        usage();
-    } else if (cliserv < 0) {
-        my_err("Must specify client or server mode!\n");
-        usage();
-    } else if ((cliserv == CLIENT)&&(*remote_ip == '\0')) {
-        my_err("Must specify server address!\n");
-        usage();
-    }*/
 
     struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_POLL_INTERNALLY,//MHD_USE_SELECT_INTERNALLY,
             portCtrl,
