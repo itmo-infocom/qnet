@@ -38,7 +38,7 @@ KEY *curKey2;
 bool use_udp = false;
 
 struct sockaddr_in si_other;
-int slen;
+socklen_t slen;
 
 const char * response_data = "OK";
 
@@ -85,7 +85,6 @@ static int ahc_echo(void * cls,
                 toclose_local = 1;
             } else {
                 fprintf(stdout, "NEW KEYS\n");
-                fflush(stdout);
                 int i = 0;
                 for (i = 0; i < post->count - 32; i += 32) {
                     KEY *k1 = ConstructKey(post->buff[i]);
@@ -159,7 +158,7 @@ void print_hex(BYTE str[], int len) {
 int cread(int fd, char *buf, int n) {
     int nread;
     if ((nread = read(fd, buf, n)) < 0) {
-        //perror("Reading data");
+        perror("Reading data");
         //exit(1);
         nread = 0;
     }
@@ -178,11 +177,12 @@ int cwrite(int fd, char *buf, int n) {
             exit(1);
         }
     } else {
-        if (connect(fd, (struct sockaddr *) &si_other, slen) < 0) {
+        if (connect(fd, (struct sockaddr *) &si_other, sizeof (si_other)) < 0) {
+            perror("connecting");
             printf("ERROR connecting");
-        }else{
-            if ((nwrite = sendto(fd, buf, n, 0, (struct sockaddr *) &si_other, slen)) < 0) {
-                //perror("Send data");
+        } else {
+            if ((nwrite = sendto(fd, buf, n, 0, (struct sockaddr *) &si_other, sizeof (si_other))) < 0) {
+                perror("Send data");
                 //exit(1);
                 nwrite = 0;
             }
@@ -298,7 +298,7 @@ bool getKeyBySha(uint8_t* sha) {
         Enqueue(q1, k1);
         Enqueue(q2, k2);
         return true;
-    }else{
+    } else {
         return false;
     }
 }
@@ -414,7 +414,8 @@ int main(int argc, char *argv[]) {
 
     if (use_udp == true) {
         memset(&si_other, 0, sizeof (si_other));
-        slen = sizeof (si_other);
+        
+        slen = sizeof si_other;
         si_other.sin_family = AF_INET;
         si_other.sin_port = htons(portother);
         si_other.sin_addr.s_addr = inet_addr(other_ip);
@@ -432,7 +433,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     do_debug("Successfully connected to interface %s\n", if_name);
-    if (use_udp) {
+    if (use_udp == true) {
         if ((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
             perror("socket()");
             exit(1);
@@ -462,10 +463,33 @@ int main(int argc, char *argv[]) {
             local.sin_family = AF_INET;
             local.sin_addr.s_addr = htonl(INADDR_ANY);
             local.sin_port = htons(port);
+            bzero(&(local.sin_zero),8);        
             if (bind(sock_fd, (struct sockaddr*) &local, sizeof (local)) < 0) {
                 perror("bind()");
                 exit(1);
             }
+            char* buf="HELLO";
+            ssize_t firstwrite = 0;
+            sleep(1);
+            if ((firstwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*)&si_other, sizeof (si_other))) < 0) {
+                perror("Send data!!!");
+                //exit(1);
+                firstwrite = 0;
+            }else{
+                printf("SENDED: %d\n",firstwrite);
+            }
+            socklen_t cslen = sizeof si_other;
+            ssize_t count=recvfrom(sock_fd,buffer,sizeof(buffer),0,(struct sockaddr *) &si_other, &cslen);
+            if (count==-1) {
+                perror("ERROR READ!!!");
+            } else if (count==sizeof(buffer)) {
+                printf("TOO LARGE\n");
+            } else {
+                printf("RECIEVED!!!: %d\n",count);
+            }
+            int flags = fcntl(sock_fd, F_GETFL);
+            flags |= O_NONBLOCK;
+            //fcntl(sock_fd, F_SETFL, flags);
         } else {
             memset(&remote, 0, sizeof (remote));
             remote.sin_family = AF_INET;
@@ -476,9 +500,9 @@ int main(int argc, char *argv[]) {
                 perror("connect()");
                 exit(1);
             }
+            do_debug("CLIENT: Connected to server %s\n", inet_ntoa(remote.sin_addr));
         }
         net_fd = sock_fd;
-        do_debug("CLIENT: Connected to server %s\n", inet_ntoa(remote.sin_addr));
     } else {
         /* Server, wait for connections */
         /* avoid EADDRINUSE error on bind() */
@@ -492,6 +516,7 @@ int main(int argc, char *argv[]) {
         local.sin_family = AF_INET;
         local.sin_addr.s_addr = htonl(INADDR_ANY);
         local.sin_port = htons(port);
+        bzero(&(local.sin_zero),8);
         if (bind(sock_fd, (struct sockaddr*) &local, sizeof (local)) < 0) {
             perror("bind()");
             exit(1);
@@ -502,7 +527,28 @@ int main(int argc, char *argv[]) {
                 perror("listen()");
                 exit(1);
             }
-        } else {
+        } else {                 
+            //ssize_t count = read(sock_fd, buffer, sizeof(buffer));
+            socklen_t cslen = sizeof si_other;
+            ssize_t count=recvfrom(sock_fd,buffer,sizeof(buffer),0,(struct sockaddr *) &si_other, &cslen);
+            if (count==-1) {
+                perror("ERROR READ!!!");
+            } else if (count==sizeof(buffer)) {
+                printf("TOO LARGE\n");
+            } else {
+                printf("RECIEVED!!!: %d\n",count);
+            }
+            char* buf="HELLO";
+            if ((nwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*)&si_other, sizeof (si_other))) < 0) {
+                perror("Send data!!!");
+                //exit(1);
+                nwrite = 0;
+            }else{
+                printf("SENDED: %d\n",nwrite);
+            }    
+            int flags = fcntl(sock_fd, F_GETFL);
+            flags |= O_NONBLOCK;
+            //fcntl(sock_fd, F_SETFL, flags);    
         }
 
         /* wait for connection request */
@@ -515,14 +561,15 @@ int main(int argc, char *argv[]) {
                 perror("accept()");
                 exit(1);
             }
+            do_debug("SERVER: Client connected from %s\n", inet_ntoa(remote.sin_addr));
         }
-        do_debug("SERVER: Client connected from %s\n", inet_ntoa(remote.sin_addr));
     }
 
     fflush(stdout);
     /* use select() to handle two descriptors at once */
     maxfd = (tap_fd > net_fd) ? tap_fd : net_fd;
     while (1) {
+        fflush(stdout);
         int ret;
         fd_set rd_set;
         FD_ZERO(&rd_set);
@@ -537,6 +584,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
         if (FD_ISSET(tap_fd, &rd_set)) {
+            FD_CLR(tap_fd, &rd_set);
             /* data from tun/tap: just read it and write it to the network */
             nread = cread(tap_fd, buffer, BUFSIZE);
             tap2net++;
@@ -599,10 +647,16 @@ int main(int argc, char *argv[]) {
                 }
             }
             nread = read_n(net_fd, buf, (sizeof (uint8_t))*32);
+            bool toexit = false;
             while (memcmp(buf, curKey2->sha, 32) != 0) {
                 if (isEmpty(q2)) {
-                    if(getKeyBySha(buf)==false)
+                    if (getKeyBySha(buf) == false) {
+                        printf("ERROR no sha");
+                        nread = cread(tap_fd, buffer, BUFSIZE);
+                        toexit = true;
                         break;
+                        //sleep(1);
+                    }
                     int i;
                     printf("\nSHAbuf:\n");
                     for (i = 0; i < 32; i++) {
@@ -625,6 +679,9 @@ int main(int argc, char *argv[]) {
                     curKey2 = Dequeue(q2);
                     do_debug("New key\n");
                 }
+            }
+            if (toexit) {
+                continue;
             }
             nread = read_n(net_fd, (char *) &plength, sizeof (plength));
             if (nread == 0) {
