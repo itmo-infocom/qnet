@@ -35,6 +35,10 @@ char *progname;
 bool toclose = false;
 KEY *curKey1;
 KEY *curKey2;
+bool use_udp = false;
+
+struct sockaddr_in si_other;
+int slen;
 
 const char * response_data = "OK";
 
@@ -155,8 +159,9 @@ void print_hex(BYTE str[], int len) {
 int cread(int fd, char *buf, int n) {
     int nread;
     if ((nread = read(fd, buf, n)) < 0) {
-        perror("Reading data");
-        exit(1);
+        //perror("Reading data");
+        //exit(1);
+        nread = 0;
     }
     return nread;
 }
@@ -167,9 +172,21 @@ int cread(int fd, char *buf, int n) {
  **************************************************************************/
 int cwrite(int fd, char *buf, int n) {
     int nwrite;
-    if ((nwrite = write(fd, buf, n)) < 0) {
-        perror("Writing data");
-        exit(1);
+    if (use_udp == false) {
+        if ((nwrite = write(fd, buf, n)) < 0) {
+            perror("Writing data");
+            exit(1);
+        }
+    } else {
+        if (connect(fd, (struct sockaddr *) &si_other, slen) < 0) {
+            printf("ERROR connecting");
+        }else{
+            if ((nwrite = sendto(fd, buf, n, 0, (struct sockaddr *) &si_other, slen)) < 0) {
+                //perror("Send data");
+                //exit(1);
+                nwrite = 0;
+            }
+        }
     }
     return nwrite;
 }
@@ -219,10 +236,13 @@ void my_err(char *msg, ...) {
 void usage(void) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s -i <ifacename> [-s|-c <serverIP>] [-p <port>] [-k <port>] [-u|-a] [-d]\n", progname);
+    fprintf(stderr, "%s -i tap0 -s -b 2221 -a -p 2222 -q 127.0.0.1 -r 55554 -k 1111 -v 192.168.1.187\n", progname);
+
+
     fprintf(stderr, "%s -h\n", progname);
     fprintf(stderr, "\n");
     fprintf(stderr, "-i <ifacename>: Name of interface to use (mandatory)\n");
-    fprintf(stderr, "-s|-c <serverIP>: run in server mode (-s), or specify server address (-c <serverIP>) (mandatory)\n");
+    fprintf(stderr, "-s <serverIP>|-c <serverIP>: run in server mode (-s), or specify server address (-c <serverIP>) (mandatory)\n");
     fprintf(stderr, "-p <port>: port to listen on (if run in server mode) or to connect to (in client mode), default 55555\n");
     fprintf(stderr, "-k <port>: port to listen keys, default 55554\n");
     fprintf(stderr, "-u|-a: use TUN (-u, default) or TAP (-a)\n");
@@ -230,7 +250,7 @@ void usage(void) {
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
-void getKeyBySha(uint8_t* sha);
+bool getKeyBySha(uint8_t* sha);
 
 void getLastKey() {
     char* nextkey = curl_get_key("last", true);
@@ -252,7 +272,7 @@ void getLastKey() {
     }
 }
 
-void getKeyBySha(uint8_t* sha) {
+bool getKeyBySha(uint8_t* sha) {
     char qbuffer[67];
     qbuffer[0] = 'k';
     qbuffer[1] = 'e';
@@ -277,6 +297,9 @@ void getKeyBySha(uint8_t* sha) {
         KEY *k2 = CopyKey(k1);
         Enqueue(q1, k1);
         Enqueue(q2, k2);
+        return true;
+    }else{
+        return false;
     }
 }
 
@@ -290,9 +313,11 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in local, remote, key_worker;
     char remote_ip[16] = ""; /* dotted quad IP string */
     char key_ip[16] = ""; /* dotted quad IP string */
+    char other_ip[16] = ""; /* dotted quad IP string */
     unsigned short int port = PORT;
     unsigned short int port_key = PORT;
     unsigned short int portCtrl = PORTC;
+    unsigned short int portother = PORT;
     int sock_fd, net_fd, optval = 1;
     socklen_t remotelen;
     int cliserv = -1; /* must be specified on cmd line */
@@ -318,7 +343,7 @@ int main(int argc, char *argv[]) {
     q2 = ConstructQueue(100);
 
     /* Check command line options */
-    while ((option = getopt(argc, argv, "i:q:r:k:sc:p:uahd")) > 0) {
+    while ((option = getopt(argc, argv, "i:q:r:k:sc:p:uahdt:v:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -345,6 +370,9 @@ int main(int argc, char *argv[]) {
             case 'p':
                 port = atoi(optarg);
                 break;
+            case 't':
+                portother = atoi(optarg);
+                break;
             case 'k':
                 portCtrl = atoi(optarg);
                 break;
@@ -354,17 +382,21 @@ int main(int argc, char *argv[]) {
             case 'a':
                 flags = IFF_TAP;
                 break;
+            case 'v':
+                use_udp = true;
+                strncpy(other_ip, optarg, 15);
+                break;
             default:
                 my_err("Unknown option %c\n", option);
                 usage();
         }
     }
-    argv += optind;
+    /*argv += optind;
     argc -= optind;
     if (argc > 0) {
         my_err("Too many options!\n");
         usage();
-    }
+    }*/
     if (*if_name == '\0') {
         my_err("Must specify interface name!\n");
         usage();
@@ -375,11 +407,18 @@ int main(int argc, char *argv[]) {
         my_err("Must specify server address!\n");
         usage();
     }
-
     memset(&key_worker, 0, sizeof (key_worker));
     key_worker.sin_family = AF_INET;
     key_worker.sin_addr.s_addr = inet_addr(key_ip);
     key_worker.sin_port = htons(port_key);
+
+    if (use_udp == true) {
+        memset(&si_other, 0, sizeof (si_other));
+        slen = sizeof (si_other);
+        si_other.sin_family = AF_INET;
+        si_other.sin_port = htons(portother);
+        si_other.sin_addr.s_addr = inet_addr(other_ip);
+    }
 
     char buffer_addr[30];
     int len = sprintf(buffer_addr, "http://%s:%d", key_ip, port_key);
@@ -393,9 +432,18 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     do_debug("Successfully connected to interface %s\n", if_name);
-    if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket()");
-        exit(1);
+    if (use_udp) {
+        if ((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+            perror("socket()");
+            exit(1);
+        }
+        printf("socket created UDP\n");
+    } else {
+        if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("socket()");
+            exit(1);
+        }
+        printf("socket created TCP\n");
     }
 
     struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,
@@ -409,25 +457,37 @@ int main(int argc, char *argv[]) {
     if (cliserv == CLIENT) {
         /* Client, try to connect to server */
         /* assign the destination address */
-        memset(&remote, 0, sizeof (remote));
-        remote.sin_family = AF_INET;
-        remote.sin_addr.s_addr = inet_addr(remote_ip);
-        remote.sin_port = htons(port);
-        /* connection request */
-        if (connect(sock_fd, (struct sockaddr*) &remote, sizeof (remote)) < 0) {
-            perror("connect()");
-            exit(1);
+        if (use_udp) {
+            memset(&local, 0, sizeof (local));
+            local.sin_family = AF_INET;
+            local.sin_addr.s_addr = htonl(INADDR_ANY);
+            local.sin_port = htons(port);
+            if (bind(sock_fd, (struct sockaddr*) &local, sizeof (local)) < 0) {
+                perror("bind()");
+                exit(1);
+            }
+        } else {
+            memset(&remote, 0, sizeof (remote));
+            remote.sin_family = AF_INET;
+            remote.sin_addr.s_addr = inet_addr(remote_ip);
+            remote.sin_port = htons(port);
+            /* connection request */
+            if (connect(sock_fd, (struct sockaddr*) &remote, sizeof (remote)) < 0) {
+                perror("connect()");
+                exit(1);
+            }
         }
         net_fd = sock_fd;
         do_debug("CLIENT: Connected to server %s\n", inet_ntoa(remote.sin_addr));
     } else {
         /* Server, wait for connections */
         /* avoid EADDRINUSE error on bind() */
-        if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof (optval)) < 0) {
-            perror("setsockopt()");
-            exit(1);
+        if (use_udp == false) {
+            if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof (optval)) < 0) {
+                perror("setsockopt()");
+                exit(1);
+            }
         }
-
         memset(&local, 0, sizeof (local));
         local.sin_family = AF_INET;
         local.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -437,21 +497,29 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        if (listen(sock_fd, 5) < 0) {
-            perror("listen()");
-            exit(1);
+        if (use_udp == false) {
+            if (listen(sock_fd, 5) < 0) {
+                perror("listen()");
+                exit(1);
+            }
+        } else {
         }
 
         /* wait for connection request */
         remotelen = sizeof (remote);
         memset(&remote, 0, remotelen);
-        if ((net_fd = accept(sock_fd, (struct sockaddr*) &remote, &remotelen)) < 0) {
-            perror("accept()");
-            exit(1);
+        if (use_udp == true) {
+            net_fd = sock_fd;
+        } else {
+            if ((net_fd = accept(sock_fd, (struct sockaddr*) &remote, &remotelen)) < 0) {
+                perror("accept()");
+                exit(1);
+            }
         }
         do_debug("SERVER: Client connected from %s\n", inet_ntoa(remote.sin_addr));
     }
 
+    fflush(stdout);
     /* use select() to handle two descriptors at once */
     maxfd = (tap_fd > net_fd) ? tap_fd : net_fd;
     while (1) {
@@ -483,13 +551,13 @@ int main(int argc, char *argv[]) {
             }
             if (curKey1 == NULL) {
                 if (isEmpty(q1)) {
-                    getLastKey();   
-                    if(isEmpty(q1)){
+                    getLastKey();
+                    if (isEmpty(q1)) {
                         do_debug("No keys\n");
                         continue;
-                    }else{
+                    } else {
                         curKey1 = Dequeue(q1);
-                        do_debug("New key\n");                        
+                        do_debug("New key\n");
                     }
                 } else {
                     curKey1 = Dequeue(q1);
@@ -499,14 +567,14 @@ int main(int argc, char *argv[]) {
                 do_debug("%d usages of key\n", curKey1->usage);
                 if (!isEmpty(q1)) {
                     curKey1 = Dequeue(q1);
-                }else{
-                    getLastKey(); 
-                    if(isEmpty(q1)){
+                } else {
+                    getLastKey();
+                    if (isEmpty(q1)) {
                         do_debug("No keys, last usage\n");
-                    }else{
+                    } else {
                         curKey1 = Dequeue(q1);
-                        do_debug("New key\n");                        
-                    }                   
+                        do_debug("New key\n");
+                    }
                 }
             }
             curKey1->usage++;
@@ -531,9 +599,10 @@ int main(int argc, char *argv[]) {
                 }
             }
             nread = read_n(net_fd, buf, (sizeof (uint8_t))*32);
-            while (memcmp(buf, curKey2->sha, 32)!=0) {
+            while (memcmp(buf, curKey2->sha, 32) != 0) {
                 if (isEmpty(q2)) {
-                    getKeyBySha(buf);
+                    if(getKeyBySha(buf)==false)
+                        break;
                     int i;
                     printf("\nSHAbuf:\n");
                     for (i = 0; i < 32; i++) {
@@ -549,8 +618,8 @@ int main(int argc, char *argv[]) {
                     if (isEmpty(q2)) {
                         do_debug("No keys\n");
                         sleep(1);
-                    }else{
-                        curKey2 = Dequeue(q2);                        
+                    } else {
+                        curKey2 = Dequeue(q2);
                     }
                 } else {
                     curKey2 = Dequeue(q2);
@@ -584,5 +653,7 @@ int main(int argc, char *argv[]) {
     MHD_stop_daemon(daemon);
     DestructQueue(q1);
     DestructQueue(q2);
+    close(net_fd);
+    close(sock_fd);
     return (0);
 }
