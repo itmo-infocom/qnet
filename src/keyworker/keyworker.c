@@ -19,7 +19,6 @@
 #include "keyqueue.h"
 #include <microhttpd.h>
 #include <db.h>
-#include <time.h>
 /* buffer for reading from tun/tap interface, must be >= 1500 */
 #define BUFSIZE 2000 
 #define CLIENT 0 
@@ -29,13 +28,9 @@
 #define DATABASE "keys.db"
 
 DB *dbhandle; // DB handle
-Queue *q1;
-Queue *q2;
 int debug;
 char *progname;
-bool toclose = false;
-KEY *curKey1;
-KEY *curKey2;
+int toclose = 0;
 
 char response_buffer[64];
 
@@ -173,7 +168,7 @@ static int ahc_echo(void * cls,
     MHD_destroy_response(response);
 
     if (toclose_local == 1) {
-        toclose = true;
+        toclose = 1;
     }
     return ret;
 }
@@ -293,6 +288,9 @@ KEY_IN_DB *getLastKey(DB *db) {
 }
 
 int main(int argc, char *argv[]) {
+    
+    fprintf(stdout, "Starting\n");
+    fflush(stdout);
     int tap_fd, option;
     int flags = IFF_TUN;
     char if_name[IFNAMSIZ] = "";
@@ -302,7 +300,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in local, remote;
     char remote_ip[16] = ""; /* dotted quad IP string */
     unsigned short int port = PORT;
-    unsigned short int portCtrl = PORTC;
+    unsigned int portCtrl = 55554;
     int sock_fd, net_fd, optval = 1;
     socklen_t remotelen;
     int cliserv = -1; /* must be specified on cmd line */
@@ -311,23 +309,30 @@ int main(int argc, char *argv[]) {
     uint8_t key[1][32] = {
         {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}
     };
-    int ret;
-
-    DB_ENV *dbenv;
+    int ret = 0;
+    
     // Initialize our DB handle
-    ret = db_create(&dbhandle, dbenv, 0);
+    ret = db_create(&dbhandle, NULL, 0);
+    fprintf(stdout, "Creating\n");
+    fflush(stdout);
     if (ret != 0) {
-        fprintf(stderr, "Failed to initialize the database handle: %s\n", db_strerror(ret));
+        fprintf(stdout, "Failed to initialize the database handle: %s\n", db_strerror(ret));
+        fflush(stdout);
         return 1;
     }
+    fprintf(stdout, "Created\n");
+    fflush(stdout);
     // Open the existing DATABASE file or create a new one if it doesn't exist.
     ret = dbhandle->open(dbhandle, NULL, DATABASE, NULL, DB_BTREE, DB_CREATE/* | DB_THREAD*/, 0);
     if (ret != 0) {
-        fprintf(stderr, "Failed to open database file %s: %s\n", DATABASE, db_strerror(ret));
+        fprintf(stdout, "Failed to open database file %s: %s\n", DATABASE, db_strerror(ret));
+        fflush(stdout);
         return 1;
     }
+    fprintf(stdout, "Opened\n");
+    fflush(stdout);
     
-    sleep(1);
+    //sleep(1);
 
     KEY *newkey = ConstructKey(key[0]);
 
@@ -352,11 +357,10 @@ int main(int argc, char *argv[]) {
 
     int pass = 1;
 
-    q1 = ConstructQueue(100);
-    q2 = ConstructQueue(100);
-
     /* Check command line options */
     
+    fflush(stdout);
+                    
     while ((option = getopt(argc, argv, "p:")) > 0) {
         switch (option) {
             case 'h':
@@ -370,23 +374,27 @@ int main(int argc, char *argv[]) {
                 usage();
         }
     }
-    argv += optind;
+    /*argv += optind;
     argc -= optind;
     if (argc > 0) {
         my_err("Too many options!\n");
         usage();
-    }
-
-    struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_POLL_INTERNALLY,//MHD_USE_SELECT_INTERNALLY,
+    }*/
+    struct MHD_Daemon *daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,/*/MHD_USE_SELECT_INTERNALLY,
             portCtrl,
             NULL,
             NULL,
             &ahc_echo,
             response_data,
             MHD_OPTION_END);
-
+    if(daemon==NULL)
+    {
+                my_err("Error in libmicrohttpd\n");        
+    }
+    
+    fflush(stdout);
     while (1) {
-        if (toclose) {
+        if (toclose==1) {
             break;
         }else{
             sleep(1);
