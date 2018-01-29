@@ -19,7 +19,15 @@ defaults:
       port: None
 
   services:
+    - &service
+      name: None
+      type: None
+      prio: 99
+      vhost: No
+      cmdline: None
+      killcmd: None
     - &ctapraw-server
+      <<: *service
       name: ctapraw-server
       type: device
       prio: 20
@@ -29,6 +37,7 @@ defaults:
       cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapraw/ctapraw -i {device} -s -a -p {port} 
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
     - &ctapraw-client
+      <<: *service
       name: ctapraw-client
       type: device
       prio: 30
@@ -39,6 +48,7 @@ defaults:
       cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapraw/ctapraw -i {device} -c {ip} -a -p {port}
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name} 
     - &ctap-server
+      <<: *service
       name: ctap-server
       type: device
       prio: 20
@@ -51,6 +61,7 @@ defaults:
       cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctap/ctap -i {device} -s -a -p {port} -r {kw_port} -k {management_port} -q {kw_ip}
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
     - &ctap-client
+      <<: *service
       name: ctap-client
       type: device
       prio: 30
@@ -64,6 +75,7 @@ defaults:
       cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctap/ctap -i {device} -c {ip} -a -p {port} -r {kw_port} -k {management_port} -q {kw_ip} 
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
     - &keyworker
+      <<: *service
       name: keyworker
       type: service
       prio: 10
@@ -73,6 +85,7 @@ defaults:
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
 
     - &httpd
+      <<: *service
       name: httpd
       type: service
       path: None
@@ -154,9 +167,9 @@ hosts:
         port: 8000
 
 
-links:
-  - [*in, *s1]
-  - [*s1, *ctap1]
-  - [*ctap2, *s2]
-  - [*s2, *out]
+    links:
+      - [*in, *s1]
+      - [*s1, *ctap1]
+      - [*ctap2, *s2]
+      - [*s2, *out]
  

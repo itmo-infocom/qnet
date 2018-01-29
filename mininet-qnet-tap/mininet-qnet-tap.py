@@ -81,7 +81,7 @@ try:
          hosts[host_name] = net.addHost(host_name,ip=host_ip, mac=host_mac)
           
 
-    for n1,n2 in config['links']:
+    for n1,n2 in host_config['links']:
         if n1['type']=='switch' and n2['type']=='device':
              intfName = n2['device']
              checkIntf(intfName)
