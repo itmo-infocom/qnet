@@ -1,6 +1,6 @@
 mininet with tap tunnels
 
-requirements: pyyaml, mininet
+requirements: pyyaml, mininet, python-daemon
 
 current config (test.yaml) assumes that qnet subtree from git is at /root/qnet and ctap and keyworker are compiled to binaries
 current config file will setup following mininet configuration on a single VM:
