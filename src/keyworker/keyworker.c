@@ -25,7 +25,6 @@
 #define SERVER 1 
 #define PORT 55555
 #define PORTC 55554
-#define DATABASE "keys.db"
 
 DB *dbhandle; // DB handle
 int debug;
@@ -310,6 +309,24 @@ int main(int argc, char *argv[]) {
         {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}
     };
     int ret = 0;
+    char dbname[255]="keys.db";
+                    
+    while ((option = getopt(argc, argv, "p:h:n:")) > 0) {
+        switch (option) {
+            case 'h':
+                usage();
+                break;
+            case 'p':
+                portCtrl = atoi(optarg);
+                break;
+            case 'n':
+                strncpy(dbname, optarg, 255);
+                break;
+            default:
+                my_err("Unknown option %c\n", option);
+                usage();
+        }
+    }
     
     // Initialize our DB handle
     ret = db_create(&dbhandle, NULL, 0);
@@ -323,9 +340,9 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Created\n");
     fflush(stdout);
     // Open the existing DATABASE file or create a new one if it doesn't exist.
-    ret = dbhandle->open(dbhandle, NULL, DATABASE, NULL, DB_BTREE, DB_CREATE/* | DB_THREAD*/, 0);
+    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE/* | DB_THREAD*/, 0);
     if (ret != 0) {
-        fprintf(stdout, "Failed to open database file %s: %s\n", DATABASE, db_strerror(ret));
+        fprintf(stdout, "Failed to open database file %s: %s\n", dbname, db_strerror(ret));
         fflush(stdout);
         return 1;
     }
@@ -360,20 +377,6 @@ int main(int argc, char *argv[]) {
     /* Check command line options */
     
     fflush(stdout);
-                    
-    while ((option = getopt(argc, argv, "p:")) > 0) {
-        switch (option) {
-            case 'h':
-                usage();
-                break;
-            case 'p':
-                portCtrl = atoi(optarg);
-                break;
-            default:
-                my_err("Unknown option %c\n", option);
-                usage();
-        }
-    }
     /*argv += optind;
     argc -= optind;
     if (argc > 0) {
