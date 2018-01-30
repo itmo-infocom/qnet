@@ -121,6 +121,7 @@ void usage(void) {
     fprintf(stderr, "-a: use TAP or TUN (without parameter)\n");
     fprintf(stderr, "-d: outputs debug information while running\n");
     fprintf(stderr, "-e <keysize>: use aes-cbc with key size\n");
+    fprintf(stderr, "-f <filepath>: use mcrypt with file\n");
     fprintf(stderr, "-q <ip>: ip to connect for keys\n");
     fprintf(stderr, "-r <port>: port to connect for keys\n");
     fprintf(stderr, "-h: prints this help text\n");
@@ -224,7 +225,8 @@ int main(int argc, char **argv) {
     char* lport = NULL;
     char* rhost = NULL;
     char* rport = NULL;
-    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:")) > 0) {
+    char* fcname = NULL;
+    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -264,6 +266,11 @@ int main(int argc, char **argv) {
             case 'e':
                 aes = atoi(optarg);
                 break;
+            case 'f':
+                aes = 0;
+                blocksize = 1;
+                fcname=optarg;
+                break;
             case 'v':
                 ip_family = AF_INET6;
                 slen = sizeof (struct sockaddr_in6);
@@ -274,43 +281,34 @@ int main(int argc, char **argv) {
         }
     }
     do_debug("loaded\n");
-    /*
-    if (argc < 3) {
-        fprintf(stderr,
-                "Usage: udptap_tunnel [-6] <localip> <localport> [<remotehost> <remoteport>]\n"
-                "    Environment variables:\n"
-                "    TUN_DEVICE  /dev/net/tun\n"
-                "    DEV_NAME    name of the device, default tun%%d\n"
-                "    IFF_TUN     if set, uses point-to-point instead ot TAP.\n"
-                "    \n"
-                "    MCRYPT_KEYFILE  -- turn on encryption, read key from this file\n"
-                "    MCRYPT_KEYSIZE  -- key size in bits, default 256\n"
-                "    MCRYPT_ALGO     -- algorithm, default is twofish. aes256 is called rijndael-256\n"
-                "    MCRYPT_MODE     -- mode, default is CBC\n"
-                "    IPV6_V6ONLY     -- bind socket only to IPv6\n"
-                );
-        exit(1);
-    }
+    if(blocksize){
+        key = calloc(1, keysize);
+        FILE* keyf = fopen(fcname, "r");
+        if (!keyf) {
+            perror("fopen keyfile");
+            return 10;
+        }
+        memset(key, 0, keysize);
+        fread(key, 1, keysize, keyf);
+        fclose(keyf);
 
-    if (!strcmp(argv[1], "-6")) {
-        ++argv;
-        ip_family = AF_INET6;
-        slen = sizeof (struct sockaddr_in6);
-    } else {
-        ip_family = AF_INET;
-        slen = sizeof (struct sockaddr_in);
+        char* algo = "twofish";
+        char* mode = "cbc";
+
+
+        td = mcrypt_module_open(algo, NULL, mode, NULL);
+        if (td == MCRYPT_FAILED) {
+            fprintf(stderr, "mcrypt_module_open failed algo=%s mode=%s keysize=%d\n", algo, mode, keysize);
+            return 11;
+        }
+        blocksize = mcrypt_enc_get_block_size(td);
+        //block_buffer = malloc(blocksize);
+
+        mcrypt_generic_init(td, key, keysize, NULL);
+
+        enc_state_size = sizeof enc_state;
+        mcrypt_enc_get_state(td, enc_state, &enc_state_size);
     }
-    int autoaddress = 1;
-    char* laddr = argv[1];
-    char* lport = argv[2];
-    char* rhost = NULL;
-    char* rport = NULL;
-    if (argc == 5) {
-        autoaddress = 0;
-        rhost = argv[3];
-        rport = argv[4];
-    }
-     */
     if ((dev = open(tun_device, O_RDWR)) < 0) {
         fprintf(stderr, "open(%s) failed: %s\n", tun_device, strerror(errno));
         exit(2);
