@@ -433,7 +433,7 @@ int main(int argc, char **argv) {
                         PrintKey(curKey1);
                         do_debug("TAP2NET: New key 2\n");
                     }
-                } else if (curKey1->usage > 10) {
+                } else if (curKey1->usage > 100) {
                     do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
                     if (!isEmpty(q1)) {
                         curKey1 = Dequeue(q1);
