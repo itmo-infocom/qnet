@@ -116,11 +116,11 @@ void usage(void) {
     fprintf(stderr, "-i <ifacename>: Name of interface to use (mandatory)\n");
     fprintf(stderr, "-s <serverIP>|-c <serverIP>: address for udp socket bind(mandatory)\n");
     fprintf(stderr, "-p <port>: port to listen on\n");
-    fprintf(stderr, "-k <ip>: ip to connect\n");
+    fprintf(stderr, "-t <ip>: ip to connect\n");
     fprintf(stderr, "-k <port>: port to connect\n");
     fprintf(stderr, "-a: use TAP or TUN (without parameter)\n");
     fprintf(stderr, "-d: outputs debug information while running\n");
-    fprintf(stderr, "-e <keysize>: use aes-cbc with key size\n");
+    fprintf(stderr, "-e <ppk>: use aes-cbc with key per packet\n");
     fprintf(stderr, "-f <filepath>: use mcrypt with file\n");
     fprintf(stderr, "-q <ip>: ip to connect for keys\n");
     fprintf(stderr, "-r <port>: port to connect for keys\n");
@@ -129,6 +129,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    int ppk = 100;
     progname = argv[0];
     unsigned char iv[] = {0xf5, 0x8c, 0x4c, 0x04, 0xd6, 0xe5, 0xf1, 0xba, 0x77, 0x9e, 0xab, 0xfb, 0x5f, 0x7b, 0xfb, 0xd6, 0x9c, 0xfc, 0x4e, 0x96, 0x7e, 0xdb, 0x80, 0x8d, 0x67, 0x9f, 0x77, 0x7b, 0xc6, 0x70, 0x2c, 0x7d};
     unsigned char iv_cur[32];
@@ -264,7 +265,8 @@ int main(int argc, char **argv) {
                 tuntap_flag = IFF_TAP;
                 break;
             case 'e':
-                aes = atoi(optarg);
+                aes = 256;
+                ppk = atoi(optarg);
                 break;
             case 'f':
                 aes = 0;
@@ -433,7 +435,7 @@ int main(int argc, char **argv) {
                         PrintKey(curKey1);
                         do_debug("TAP2NET: New key 2\n");
                     }
-                } else if (curKey1->usage > 100) {
+                } else if (curKey1->usage > ppk) {
                     do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
                     if (!isEmpty(q1)) {
                         curKey1 = Dequeue(q1);
@@ -559,3 +561,4 @@ int main(int argc, char **argv) {
         mcrypt_module_close(td);
     }
 }
+
