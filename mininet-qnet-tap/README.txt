@@ -2,7 +2,11 @@ mininet with tap tunnels
 
 requirements: pyyaml, mininet, python-daemon
 
-current config (test.yaml) assumes that qnet subtree from git is at /root/qnet and ctap and keyworker are compiled to binaries
+to run mininet code:
+
+# python mininet-qnet-tap.py defaults.yaml single-host-udp.yaml h1
+
+current configs assumes that qnet subtree from git is at /root/qnet and ctap and keyworker are compiled to binaries
 current config file will setup following mininet configuration on a single VM:
 
 in -- s1 - tap0--tap1 - s2 -- out

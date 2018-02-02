@@ -15,8 +15,8 @@ import sys
 import pprint
 import time
 
-config = yaml.load(open(sys.argv[1]))
-host = sys.argv[2]
+config = yaml.load(open(sys.argv[1]).read()+open(sys.argv[2]).read())
+host = sys.argv[3]
 #pprint.pprint(config)
 
 setLogLevel('info')

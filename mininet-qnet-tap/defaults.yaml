@@ -1,0 +1,139 @@
+defaults:
+  hosts:
+    - &vhost
+      name: default
+      type: vhost
+      ip: None
+      mac: None
+  switches:
+    - &switch
+      name: default
+      type: switch
+      controller: None
+      
+  controllers:
+    - &controller
+      name: unmagaed
+      type: controller
+      ip: None
+      port: None
+
+  services:
+    - &service
+      name: None
+      type: None
+      prio: 99
+      vhost: No
+      cmdline: None
+      killcmd: None
+    - &ctapraw-server
+      <<: *service
+      name: ctapraw-server
+      type: device
+      prio: 20
+      device: tap0
+      port: None
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapraw/ctapraw -i {device} -s -a -p {port} 
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+    - &ctapraw-client
+      <<: *service
+      name: ctapraw-client
+      type: device
+      prio: 30
+      device: tap0
+      ip: None
+      port: None
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapraw/ctapraw -i {device} -c {ip} -a -p {port}
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name} 
+    - &ctap-server
+      <<: *service
+      name: ctap-server
+      type: device
+      prio: 20
+      device: tap0
+      port: None
+      kw_port: None
+      kw_ip: 127.0.0.1
+      management_port: None
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctap/ctap -i {device} -s -a -p {port} -r {kw_port} -k {management_port} -q {kw_ip}
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+    - &ctap-client
+      <<: *service
+      name: ctap-client
+      type: device
+      prio: 30
+      device: tap0
+      ip: None
+      port: None
+      kw_port: None
+      kw_ip: 127.0.0.1
+      management_port: None
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctap/ctap -i {device} -c {ip} -a -p {port} -r {kw_port} -k {management_port} -q {kw_ip} 
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+
+    - &ctapudp-server
+      <<: *service
+      name: ctapudp-server
+      type: device
+      prio: 20
+      device: tap0
+      bind_ip: None
+      bind_port: None
+      ip: None
+      port: None
+      kw_port: None
+      kw_ip: 127.0.0.1
+      management_port: None
+      key_reuse: 10
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapudp/ctapudp -s {bind_ip} -p {bind_port} -t {ip} -k {port} -q {kw_ip} -r {kw_port} -i {device} -e {key_reuse} -a 1 -d 1
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+    - &ctapudp-client
+      <<: *service
+      name: ctapudp-client
+      type: device
+      prio: 30
+      device: tap0
+      bind_ip: None
+      bind_port: None
+      ip: None
+      port: None
+      kw_port: None
+      kw_ip: 127.0.0.1
+      management_port: None
+      key_reuse: 10
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/ctapudp/ctapudp -c {bind_ip} -p {bind_port} -t {ip} -k {port} -q {kw_ip} -r {kw_port} -i {device} -e {key_reuse} -a 1 -d 1
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+
+
+    - &keyworker
+      <<: *service
+      name: keyworker
+      type: service
+      prio: 10
+      port: None
+      vhost: None
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/keyworker/keyworker -p {port} -n {name}.db 
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+
+    - &httpd
+      <<: *service
+      name: httpd
+      type: service
+      path: None
+      vhost: None
+      prio: 50
+      port: None
+      cmdline: cd {path}; python /root/qnet/mininet-qnet/run_daemon.py start {name} python -m  SimpleHTTPServer {port}
+      killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
+
+    - &sshd
+      name: sshd
+      switch: None
+      ip: None
+      
