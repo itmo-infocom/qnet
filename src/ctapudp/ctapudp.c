@@ -437,20 +437,7 @@ int main(int argc, char **argv) {
                         PrintKey(curKey1);
                         do_debug("TAP2NET: New key 2\n");
                     }
-                } else if (curKey1->usage > ppk) {
-                    do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
-                    if (!isEmpty(q1)) {
-                        curKey1 = Dequeue(q1);
-                    } else {
-                        getLastKey();
-                        if (isEmpty(q1)) {
-                            do_debug("TAP2NET: No keys, last usage\n");
-                        } else {
-                            curKey1 = Dequeue(q1);
-                            do_debug("TAP2NET: New key 3\n");
-                        }
-                    }
-                }
+                } 
                 curKey1->usage++;
                 memcpy(buf, curKey1->sha, 32);
                 memcpy(buf+32, &cnt, 2);
@@ -468,6 +455,22 @@ int main(int argc, char **argv) {
             }
             sendto(sock, &buf, cnt, 0, &addr.a, slen);
             do_debug("TAP2NET: sended %d bytes\n",cnt);
+            if(aes){
+                if (curKey1->usage > ppk) {
+                    do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
+                    if (!isEmpty(q1)) {
+                        curKey1 = Dequeue(q1);
+                    } else {
+                        getLastKey();
+                        if (isEmpty(q1)) {
+                            do_debug("TAP2NET: No keys, last usage\n");
+                        } else {
+                            curKey1 = Dequeue(q1);
+                            do_debug("TAP2NET: New key 3\n");
+                        }
+                    }
+                }
+            }
         }
 
         if (FD_ISSET(sock, &rfds)) {
