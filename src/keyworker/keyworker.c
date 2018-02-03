@@ -65,6 +65,7 @@ static int ahc_echo(void * cls,
     int toclose_local = 0;
     struct postStatus *post = NULL;
     post = (struct postStatus*) *ptr;
+    int to_sync = 0;
 
     if (post == NULL) {
         post = malloc(sizeof (struct postStatus));
@@ -102,6 +103,7 @@ static int ahc_echo(void * cls,
                 response = MHD_create_response_from_buffer(sizeof (response_buffer),
                         (void *) response_buffer,
                         MHD_RESPMEM_PERSISTENT);
+                to_sync = 1;
                 //free(lastKey);
             } else
                 if (strncmp(post->buff, "key", 3) == 0) {
@@ -109,7 +111,7 @@ static int ahc_echo(void * cls,
                 uint8_t sha[32];
                 int i;
                 for (i = 0; i < 32; i++) {
-                    sscanf(post->buff + 3 + i * 2, "%02X", &(sha[i]));
+                    sscanf(post->buff + 3 + i * 2, "%2" SCNx8, &(sha[i]));
                 }
                 for (i = 0; i < 32; i++) {
                     printf("%02X", sha[i]);
@@ -123,7 +125,7 @@ static int ahc_echo(void * cls,
                     response = MHD_create_response_from_buffer(sizeof (response_buffer),
                             (void *) response_buffer,
                             MHD_RESPMEM_PERSISTENT);
-                    //free(lastKey);
+                    free(lastKey);
                 } else {
                     response = NULL;
                 }
@@ -133,14 +135,16 @@ static int ahc_echo(void * cls,
                 bool isadded = false;
                 for (j = 0; j <= post->count - 64; j += 64) {
                     for (i = 0; i < 32; i++) {
-                        sscanf(post->buff + j * 64 + i * 2, "%02X", &(key[i]));
+                        sscanf((post->buff + j + i * 2), "%2" SCNx8, &(key[i]));
                     }
+                    printf("\n j=%d \n", j);
                     KEY *k1 = ConstructKey(key);
-                    int ret = putKey(k1, dbhandle);
                     PrintKey(k1);
-                    //free(k1);
-                    if(ret==0)
+                    int ret = putKey(k1, dbhandle);
+                    free(k1);
+                    if (ret == 0) {
                         isadded = true;
+                    }
                 }
                 if (isadded) {
                     fprintf(stdout, "NEW KEYS\n");
@@ -150,6 +154,7 @@ static int ahc_echo(void * cls,
                     response = MHD_create_response_from_buffer(2,
                             (void*) response_buffer,
                             MHD_RESPMEM_PERSISTENT);
+                    to_sync = 1;
                 } else {
                     response = NULL;
                 }
@@ -165,6 +170,9 @@ static int ahc_echo(void * cls,
             MHD_HTTP_OK,
             response);
     MHD_destroy_response(response);
+    if (to_sync == 1) {
+        dbhandle->sync(dbhandle, 0);
+    }
 
     if (toclose_local == 1) {
         toclose = 1;
@@ -212,7 +220,7 @@ int putKey(KEY *k, DB *db) {
     DBT db_key, db_data;
     KEY_IN_DB *key_in = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
     if (key_in == NULL) {
-        return NULL;
+        return 1;
     }
     uint8_t key_buffer[32];
     memset(&db_key, 0, sizeof (DBT));
@@ -231,14 +239,19 @@ int putKey(KEY *k, DB *db) {
     if (ret != 0) {
         my_err("Key ID exists\n");
     }
-    db->sync(db, 0);
+    free(key_in);
     return ret;
 }
 
 KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
+    KEY_IN_DB *keyret = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
+    if (keyret == NULL) {
+        return NULL;
+    }
     DBT key, data;
     memset(&key, 0, sizeof (key));
     memset(&data, 0, sizeof (data));
+    data.flags = DB_DBT_MALLOC;
     key.data = sha;
     key.size = sizeof (uint8_t)*32;
     //data.data = &key_in;
@@ -246,7 +259,9 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
     //data.flags = DB_DBT_USERMEM;
     int ret = db->get(db, NULL, &key, &data, 0);
     if (ret == 0) {
-        return data.data;
+        memcpy(keyret, data.data, sizeof (KEY_IN_DB));
+        free(data.data);
+        return keyret;
     } else {
         printf("NOT FOUND\n");
         return NULL;
@@ -256,16 +271,17 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
 KEY_IN_DB *getLastKey(DB *db) {
     DBT key_dbt, data_dbt;
     DBC *dbc;
-    KEY_IN_DB *k = NULL;
+    KEY_IN_DB *k = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
     memset(&key_dbt, 0, sizeof (DBT));
     memset(&data_dbt, 0, sizeof (DBT));
+    data_dbt.flags = DB_DBT_MALLOC;
     db->cursor(db, NULL, &dbc, 0);
     int ret;
     bool flag = false;
     for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
             ret == 0;
             ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
-        k = data_dbt.data;
+        memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
         if (k->usage != 0) {
             if (flag) {
                 ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
@@ -280,14 +296,15 @@ KEY_IN_DB *getLastKey(DB *db) {
     }
     if (k != NULL) {
         k->usage++;
+        ((KEY_IN_DB*)data_dbt.data)->usage=k->usage;
         dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
-        db->sync(db, 0);
     }
+    free(data_dbt.data);
     return k;
 }
 
 int main(int argc, char *argv[]) {
-    
+
     fprintf(stdout, "Starting\n");
     fflush(stdout);
     int tap_fd, option;
@@ -309,8 +326,8 @@ int main(int argc, char *argv[]) {
         {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}
     };
     int ret = 0;
-    char dbname[255]="keys.db";
-                    
+    char dbname[255] = "keys.db";
+
     while ((option = getopt(argc, argv, "p:h:n:")) > 0) {
         switch (option) {
             case 'h':
@@ -327,7 +344,7 @@ int main(int argc, char *argv[]) {
                 usage();
         }
     }
-    
+
     // Initialize our DB handle
     ret = db_create(&dbhandle, NULL, 0);
     fprintf(stdout, "Creating\n");
@@ -340,7 +357,7 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Created\n");
     fflush(stdout);
     // Open the existing DATABASE file or create a new one if it doesn't exist.
-    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE/* | DB_THREAD*/, 0);
+    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE | DB_THREAD, 0);
     if (ret != 0) {
         fprintf(stdout, "Failed to open database file %s: %s\n", dbname, db_strerror(ret));
         fflush(stdout);
@@ -348,7 +365,7 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stdout, "Opened\n");
     fflush(stdout);
-    
+
     //sleep(1);
 
     KEY *newkey = ConstructKey(key[0]);
@@ -359,11 +376,14 @@ int main(int argc, char *argv[]) {
 
     KEY_IN_DB *retKey = getByKey(newkey->sha, dbhandle);
 
+    free(newkey);
+
     if (retKey != NULL) {
         printf("1111");
         KEY *nextKey = ConstructKeyUsage(retKey->key, retKey->usage);
         PrintKey(nextKey);
         //PrintKey(ConstructKeyUsage(nextKey->key, nextKey->usage));
+        free(retKey);
     }
 
     KEY_IN_DB *lastKey = getLastKey(dbhandle);
@@ -375,7 +395,7 @@ int main(int argc, char *argv[]) {
     int pass = 1;
 
     /* Check command line options */
-    
+
     fflush(stdout);
     /*argv += optind;
     argc -= optind;
@@ -383,24 +403,23 @@ int main(int argc, char *argv[]) {
         my_err("Too many options!\n");
         usage();
     }*/
-    struct MHD_Daemon *daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,/*/MHD_USE_SELECT_INTERNALLY,
+    struct MHD_Daemon *daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,*/MHD_USE_SELECT_INTERNALLY, //MHD_USE_EPOLL_LINUX_ONLY,
             portCtrl,
             NULL,
             NULL,
             &ahc_echo,
-            response_data,
+            NULL,
             MHD_OPTION_END);
-    if(daemon==NULL)
-    {
-                my_err("Error in libmicrohttpd\n");        
+    if (daemon == NULL) {
+        my_err("Error in libmicrohttpd\n");
     }
-    
+
     fflush(stdout);
     while (1) {
-        if (toclose==1) {
+        if (toclose == 1) {
             break;
-        }else{
-            sleep(1);
+        } else {
+            usleep(1);
         }
     }
     MHD_stop_daemon(daemon);
@@ -410,3 +429,4 @@ int main(int argc, char *argv[]) {
     //DestructQueue(q2);
     return (0);
 }
+

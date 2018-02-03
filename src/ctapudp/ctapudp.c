@@ -107,8 +107,8 @@ char *progname;
 void usage(void) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s -i <ifacename> [-s|-c <serverIP>] [-p <port>] [-k <port>] [-u|-a] [-d]\n", progname);
-    fprintf(stderr, "%s ./ctapudp -s 0.0.0.0 -p 3443 -q 127.0.0.1 -r 55554 -i udp0 -e 256 -a -d\n", progname);
-    fprintf(stderr, "%s ./ctapudp -c 0.0.0.0 -p 0 -q 192.168.1.199 -r 55554 -t 192.168.1.199 -k 3443 -i udp0 -e 256 -a -d\n", progname);
+    fprintf(stderr, "%s ./ctapudp -s 0.0.0.0 -p 3443 -q 127.0.0.1 -r 55554 -i udp0 -e 100 -a 1 -d 1\n", progname);
+    fprintf(stderr, "%s ./ctapudp -c 0.0.0.0 -p 0 -q 192.168.1.199 -r 55554 -t 192.168.1.199 -k 3443 -i udp0 -e 100 -a 1 -d 1\n", progname);
 
 
     fprintf(stderr, "%s -h\n", progname);
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
     char* tun_device = "/dev/net/tun";
     char* dev_name = "tun%d";
     int tuntap_flag = IFF_TAP;
-
+    /*
     if (getenv("TUN_DEVICE")) {
         tun_device = getenv("TUN_DEVICE");
     }
@@ -216,6 +216,7 @@ int main(int argc, char **argv) {
             port_key = atoi(getenv("KEYWORKER_PORT"));
         }
     }
+    */
     tuntap_flag = IFF_TUN;
     int option;
     int ip_family = AF_INET;
@@ -419,7 +420,8 @@ int main(int argc, char **argv) {
                 mcrypt_enc_set_state(td, enc_state, enc_state_size);
             } else
                 if (aes) {
-                cnt = read(dev, (void*) &(*(buf + 32)), 1518);
+                cnt = read(dev, (void*) &(*(buf + 34)), 1518);        
+                do_debug("TAP2NET: received %d bytes\n",cnt);
                 if (curKey1 == NULL) {
                     if (isEmpty(q1)) {
                         getLastKey();
@@ -435,7 +437,26 @@ int main(int argc, char **argv) {
                         PrintKey(curKey1);
                         do_debug("TAP2NET: New key 2\n");
                     }
-                } else if (curKey1->usage > ppk) {
+                } 
+                curKey1->usage++;
+                memcpy(buf, curKey1->sha, 32);
+                memcpy(buf+32, &cnt, 2);
+                memcpy(iv_cur, iv, AES_BLOCK_SIZE);
+                cnt += 2;
+                int diff = cnt % 128;
+                if (diff != 0) {
+                    cnt = cnt + (128 - diff);
+                } else {
+                    cnt = cnt;
+                }
+                AES_set_encrypt_key(curKey1->key, aes, &enc_key);
+                AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &enc_key, iv_cur, AES_ENCRYPT);
+                cnt += 32;
+            }
+            sendto(sock, &buf, cnt, 0, &addr.a, slen);
+            do_debug("TAP2NET: sended %d bytes\n",cnt);
+            if(aes){
+                if (curKey1->usage > ppk) {
                     do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
                     if (!isEmpty(q1)) {
                         curKey1 = Dequeue(q1);
@@ -449,24 +470,12 @@ int main(int argc, char **argv) {
                         }
                     }
                 }
-                curKey1->usage++;
-                memcpy(buf, curKey1->sha, 32);
-                memcpy(iv_cur, iv, AES_BLOCK_SIZE);
-                int diff = cnt % 128;
-                if (diff != 0) {
-                    cnt = cnt + (128 - diff);
-                } else {
-                    cnt = cnt;
-                }
-                AES_set_encrypt_key(curKey1->key, aes, &enc_key);
-                AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &enc_key, iv_cur, AES_ENCRYPT);
-                cnt += 32;
             }
-            sendto(sock, &buf, cnt, 0, &addr.a, slen);
         }
 
         if (FD_ISSET(sock, &rfds)) {
             cnt = recvfrom(sock, &buf, 2000, 0, &from.a, &slen);
+            do_debug("NET2TAP: received %d bytes\n",cnt);
 
             if (curKey2 == NULL) {
                 if (isEmpty(q2)) {
@@ -502,6 +511,7 @@ int main(int argc, char **argv) {
                     mdecrypt_generic(td, buf, cnt);
                     mcrypt_enc_set_state(td, enc_state, enc_state_size);
                     write(dev, (void*) &buf, cnt);
+                    do_debug("NET2TAP: sended %d bytes\n",cnt);
                 } else if (aes) {
                     bool toexit = false;
                     while (memcmp(buf, curKey2->sha, 32) != 0) {
@@ -550,7 +560,9 @@ int main(int argc, char **argv) {
                     }
                     AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &dec_key, iv_cur, AES_DECRYPT);
-                    write(dev, (void*) &(*(buf + 32)), cnt);
+                    memcpy(&cnt,buf+32,2);
+                    write(dev, (void*) &(*(buf + 34)), cnt);
+                    do_debug("NET2TAP: sended %d bytes\n",cnt);
                 }
             }
         }
@@ -561,4 +573,3 @@ int main(int argc, char **argv) {
         mcrypt_module_close(td);
     }
 }
-
