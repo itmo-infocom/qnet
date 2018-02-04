@@ -1,0 +1,46 @@
+hosts:
+  h1: 
+    ip: &h1_ip 192.168.122.243
+    phys: []
+    controllers:
+      - &c0
+        <<: *controller
+        name: c0
+        port: 6634
+    vhosts:
+      - &in
+        <<: *vhost
+        name: in
+        ip: 10.0.0.1/24
+        mac: 00:00:00:00:00:01
+      - &out
+        <<: *vhost
+        name: out
+        ip: 10.0.0.2/24
+        mac: 00:00:00:00:00:02
+    switches:
+      - &s1
+        <<: *switch
+        name: s1
+        controller: *c0
+      - &s2
+        <<: *switch
+        name: s2
+        controller: *c0
+
+    pre-scripts: []
+
+    post-scripts: 
+      - &httpd-out
+        <<: *httpd
+        name: httpd-out
+        path: /root/qnet/mininet-qnet-tap/data
+        vhost: *out
+        port: 8000
+
+
+    links:
+      - [*in, *s1]
+      - [*s1, *s2]
+      - [*s2, *out]
+ 
