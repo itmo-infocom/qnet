@@ -504,7 +504,7 @@ int main(int argc, char **argv) {
             cnt = recvfrom(sock, &buf, 2000, 0, &from.a, &slen);
             do_debug("NET2TAP: received %d bytes\n", cnt);
             if (aes) {
-                    int keychanged = 0;
+                int keychanged = 0;
                 if (curKey2 == NULL) {
                     if (isEmpty(q2)) {
                         continue;
@@ -513,7 +513,7 @@ int main(int argc, char **argv) {
                         keychanged = 1;
                     }
                     if (keychanged) {
-                    AES_set_decrypt_key(curKey2->key, aes, &dec_key);
+                        AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     }
                 }
             }
@@ -551,22 +551,26 @@ int main(int argc, char **argv) {
                     while (memcmp(buf, curKey2->sha, 32) != 0) {
                         if (isEmpty(q2)) {
                             int i;
-                            do_debug("\nSHAbuf:\n");
-                            for (i = 0; i < 32; i++) {
-                                do_debug("%02X", buf[i]);
+                            if (debug) {
+                                do_debug("\nSHAbuf:\n");
+                                for (i = 0; i < 32; i++) {
+                                    do_debug("%02X", buf[i]);
+                                }
+                                do_debug("\n");
                             }
-                            do_debug("\n");
                             if (getKeyBySha(buf) == false) {
                                 do_debug("NET2TAP: ERROR no sha\n");
                                 toexit = true;
                                 break;
                                 //sleep(1);
                             }
-                            do_debug("\nSHAcur:\n");
-                            for (i = 0; i < 32; i++) {
-                                do_debug("%02X", curKey2->sha[i]);
+                            if (debug) {
+                                do_debug("\nSHAcur:\n");
+                                for (i = 0; i < 32; i++) {
+                                    do_debug("%02X", curKey2->sha[i]);
+                                }
+                                do_debug("\nGETNEW\n");
                             }
-                            do_debug("\nGETNEW\n");
                             if (isEmpty(q2)) {
                                 do_debug("NET2TAP: No keys\n");
                                 usleep(100);
@@ -584,7 +588,7 @@ int main(int argc, char **argv) {
                         continue;
                     }
                     if (keychanged) {
-                    AES_set_decrypt_key(curKey2->key, aes, &dec_key);
+                        AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     }
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     cnt -= 32;

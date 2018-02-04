@@ -35,6 +35,7 @@ int toclose = 0;
 char response_buffer[64];
 
 const char * response_data = "OK\0";
+int debug = 0;
 
 typedef struct {
     uint8_t key[32];
@@ -96,7 +97,9 @@ static int ahc_echo(void * cls,
             } else
                 if (strncmp(post->buff, "last", 4) == 0) {
                 KEY_IN_DB *lastKey = getLastKey(dbhandle);
-                PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+                if (debug) {
+                    PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+                }
                 int i;
                 for (i = 0; i < 32; i++) {
                     sprintf(response_buffer + i * 2, "%02X", lastKey->key[i]);
@@ -114,12 +117,16 @@ static int ahc_echo(void * cls,
                 for (i = 0; i < 32; i++) {
                     sscanf(post->buff + 3 + i * 2, "%2" SCNx8, &(sha[i]));
                 }
-                for (i = 0; i < 32; i++) {
-                    printf("%02X", sha[i]);
+                if (debug) {
+                    for (i = 0; i < 32; i++) {
+                        printf("%02X", sha[i]);
+                    }
                 }
                 KEY_IN_DB *lastKey = getByKey(sha, dbhandle);
                 if (lastKey != NULL) {
-                    PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+                    if (debug) {
+                        PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+                    }
                     for (i = 0; i < 32; i++) {
                         sprintf(response_buffer + i * 2, "%02X", lastKey->key[i]);
                     }
@@ -138,9 +145,13 @@ static int ahc_echo(void * cls,
                     for (i = 0; i < 32; i++) {
                         sscanf((post->buff + j + i * 2), "%2" SCNx8, &(key[i]));
                     }
-                    printf("\n j=%d \n", j);
+                    if (debug) {
+                        printf("\n j=%d \n", j);
+                    }
                     KEY *k1 = ConstructKey(key);
-                    PrintKey(k1);
+                    if (debug) {
+                        PrintKey(k1);
+                    }
                     int ret = putKey(k1, dbhandle);
                     free(k1);
                     if (ret == 0) {
@@ -148,8 +159,10 @@ static int ahc_echo(void * cls,
                     }
                 }
                 if (isadded) {
-                    fprintf(stdout, "NEW KEYS\n");
-                    fflush(stdout);
+                    if (debug) {
+                        fprintf(stdout, "NEW KEYS\n");
+                        fflush(stdout);
+                    }
                     response_buffer[0] = 'O';
                     response_buffer[1] = 'K';
                     response = MHD_create_response_from_buffer(2,
@@ -264,7 +277,7 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
         free(data.data);
         return keyret;
     } else {
-        printf("NOT FOUND\n");
+        my_err("NOT FOUND\n");
         return NULL;
     }
 }
@@ -296,9 +309,11 @@ KEY_IN_DB *getLastKey(DB *db) {
         }
     }
     if (k != NULL) {
-        k->usage++;
-        ((KEY_IN_DB*)data_dbt.data)->usage=k->usage;
-        dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
+        if (k->usage < 250) {
+            k->usage++;
+            ((KEY_IN_DB*) data_dbt.data)->usage = k->usage;
+            dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
+        }
     }
     free(data_dbt.data);
     return k;
@@ -307,11 +322,12 @@ KEY_IN_DB *getLastKey(DB *db) {
 struct MHD_Daemon *my_daemon;
 
 void intHandler(int dummy) {
-    printf("\nEXIT\n");    
+    printf("\nEXIT\n");
     MHD_stop_daemon(my_daemon);
     dbhandle->close(dbhandle, 0);
     exit(0);
 }
+
 int main(int argc, char *argv[]) {
     signal(SIGINT, intHandler);
     fprintf(stdout, "Starting\n");
@@ -337,8 +353,11 @@ int main(int argc, char *argv[]) {
     int ret = 0;
     char dbname[255] = "keys.db";
 
-    while ((option = getopt(argc, argv, "p:h:n:")) > 0) {
+    while ((option = getopt(argc, argv, "p:h:n:d:")) > 0) {
         switch (option) {
+            case 'd':
+                debug = 1;
+                break;
             case 'h':
                 usage();
                 break;
@@ -356,30 +375,37 @@ int main(int argc, char *argv[]) {
 
     // Initialize our DB handle
     ret = db_create(&dbhandle, NULL, 0);
-    fprintf(stdout, "Creating\n");
-    fflush(stdout);
+    if (debug) {
+        fprintf(stdout, "Creating\n");
+        fflush(stdout);
+    }
     if (ret != 0) {
         fprintf(stdout, "Failed to initialize the database handle: %s\n", db_strerror(ret));
         fflush(stdout);
         return 1;
     }
-    fprintf(stdout, "Created\n");
-    fflush(stdout);
-    // Open the existing DATABASE file or create a new one if it doesn't exist.
+    if (debug) {
+        fprintf(stdout, "Created\n");
+        fflush(stdout);
+    }
     ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE | DB_THREAD, 0);
     if (ret != 0) {
         fprintf(stdout, "Failed to open database file %s: %s\n", dbname, db_strerror(ret));
         fflush(stdout);
         return 1;
     }
-    fprintf(stdout, "Opened\n");
-    fflush(stdout);
+    if (debug) {
+        fprintf(stdout, "Opened\n");
+        fflush(stdout);
+    }
 
     //sleep(1);
 
     KEY *newkey = ConstructKey(key[0]);
 
-    PrintKey(newkey);
+    if (debug) {
+        PrintKey(newkey);
+    }
 
     putKey(newkey, dbhandle);
 
@@ -388,17 +414,24 @@ int main(int argc, char *argv[]) {
     free(newkey);
 
     if (retKey != NULL) {
-        printf("1111");
+        if (debug) {
+            printf("1111");
+        }
         KEY *nextKey = ConstructKeyUsage(retKey->key, retKey->usage);
-        PrintKey(nextKey);
+
+        if (debug) {
+            PrintKey(nextKey);
+        }
         //PrintKey(ConstructKeyUsage(nextKey->key, nextKey->usage));
         free(retKey);
     }
 
-    KEY_IN_DB *lastKey = getLastKey(dbhandle);
-    if (lastKey != NULL) {
-        printf("2222");
-        PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+    if (debug) {
+        KEY_IN_DB *lastKey = getLastKey(dbhandle);
+        if (lastKey != NULL) {
+            printf("2222");
+            PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
+        }
     }
 
     int pass = 1;
@@ -428,7 +461,7 @@ int main(int argc, char *argv[]) {
         if (toclose == 1) {
             break;
         } else {
-            usleep(10);
+            usleep(20);
         }
     }
     //DestructQueue(q1);
