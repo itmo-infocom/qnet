@@ -29,3 +29,16 @@ to exit from namespace simply exit bash instance.
 
 OpenFlow:
 There is no need for any custom (dynamic) rules in this configuration.
+
+------------
+
+2 host configuration:
+on host1:
+# python mininet-qnet-tap.py defaults.yaml 2-host-udp.yaml h1
+
+on host2:
+# python mininet-qnet-tap.py defaults.yaml 2-host-udp.yaml h2
+
+host1 has ip 192.168.0.1
+host2 -- 192.168.0.2
+
