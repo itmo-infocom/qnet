@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -128,14 +129,32 @@ void usage(void) {
     exit(1);
 }
 
+int blocksize = 0;
+int aes = 0;
+
+MCRYPT td;
+
+void intHandler(int dummy) {
+    printf("\nEXIT\n");
+    if (aes) {
+        curl_clear();
+    }
+    if (blocksize) {
+        mcrypt_generic_deinit(td);
+        mcrypt_module_close(td);
+    }
+    exit(0);
+}
+
 int main(int argc, char **argv) {
-    int ppk = 100;
+    signal(SIGINT, intHandler);
+    uint16_t ppk = 100;
     progname = argv[0];
     unsigned char iv[] = {0xf5, 0x8c, 0x4c, 0x04, 0xd6, 0xe5, 0xf1, 0xba, 0x77, 0x9e, 0xab, 0xfb, 0x5f, 0x7b, 0xfb, 0xd6, 0x9c, 0xfc, 0x4e, 0x96, 0x7e, 0xdb, 0x80, 0x8d, 0x67, 0x9f, 0x77, 0x7b, 0xc6, 0x70, 0x2c, 0x7d};
     unsigned char iv_cur[32];
     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
     struct addrinfo hints;
-    struct addrinfo *result, *rp;
+    struct addrinfo *result;
     char key_ip[30] = "127.0.0.1";
     unsigned int port_key = 55554;
 
@@ -149,13 +168,7 @@ int main(int argc, char **argv) {
 
     //printf("IN: %s\n", text);
     AES_KEY enc_key, dec_key;
-
-    MCRYPT td;
-    int i;
     char *key;
-    char *block_buffer;
-    int blocksize = 0;
-    int aes = 0;
     int keysize = 32; /* 256 bits == 32 bytes */
     char enc_state[1024];
     int enc_state_size;
@@ -216,7 +229,7 @@ int main(int argc, char **argv) {
             port_key = atoi(getenv("KEYWORKER_PORT"));
         }
     }
-    */
+     */
     tuntap_flag = IFF_TUN;
     int option;
     int ip_family = AF_INET;
@@ -237,15 +250,15 @@ int main(int argc, char **argv) {
                 usage();
                 break;
             case 'i':
-                dev_name=optarg;
+                dev_name = optarg;
                 break;
             case 's':
                 autoaddress = 1;
-                laddr=optarg;
+                laddr = optarg;
                 break;
             case 'c':
                 autoaddress = 0;
-                laddr=optarg;
+                laddr = optarg;
                 break;
             case 'q':
                 strncpy(key_ip, optarg, 15);
@@ -254,13 +267,13 @@ int main(int argc, char **argv) {
                 port_key = atoi(optarg);
                 break;
             case 'p':
-                lport=optarg;
+                lport = optarg;
                 break;
             case 't':
-                rhost=optarg;
+                rhost = optarg;
                 break;
             case 'k':
-                rport=optarg;
+                rport = optarg;
                 break;
             case 'a':
                 tuntap_flag = IFF_TAP;
@@ -272,7 +285,7 @@ int main(int argc, char **argv) {
             case 'f':
                 aes = 0;
                 blocksize = 1;
-                fcname=optarg;
+                fcname = optarg;
                 break;
             case 'v':
                 ip_family = AF_INET6;
@@ -284,7 +297,7 @@ int main(int argc, char **argv) {
         }
     }
     do_debug("loaded\n");
-    if(blocksize){
+    if (blocksize) {
         key = calloc(1, keysize);
         FILE* keyf = fopen(fcname, "r");
         if (!keyf) {
@@ -420,9 +433,10 @@ int main(int argc, char **argv) {
                 mcrypt_enc_set_state(td, enc_state, enc_state_size);
             } else
                 if (aes) {
-                cnt = read(dev, (void*) &(*(buf + 34)), 1518);        
-                do_debug("TAP2NET: received %d bytes\n",cnt);
+                cnt = read(dev, (void*) &(*(buf + 34)), 1518);
+                do_debug("TAP2NET: received %d bytes\n", cnt);
                 if (curKey1 == NULL) {
+                    int keychanged = 0;
                     if (isEmpty(q1)) {
                         getLastKey();
                         if (isEmpty(q1)) {
@@ -431,16 +445,21 @@ int main(int argc, char **argv) {
                         } else {
                             curKey1 = Dequeue(q1);
                             do_debug("TAP2NET: New key 1\n");
+                            keychanged = 1;
                         }
                     } else {
                         curKey1 = Dequeue(q1);
                         PrintKey(curKey1);
                         do_debug("TAP2NET: New key 2\n");
+                        keychanged = 1;
                     }
-                } 
+                    if (keychanged) {
+                        AES_set_encrypt_key(curKey1->key, aes, &enc_key);
+                    }
+                }
                 curKey1->usage++;
                 memcpy(buf, curKey1->sha, 32);
-                memcpy(buf+32, &cnt, 2);
+                memcpy(buf + 32, &cnt, 2);
                 memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                 cnt += 2;
                 int diff = cnt % 128;
@@ -449,17 +468,21 @@ int main(int argc, char **argv) {
                 } else {
                     cnt = cnt;
                 }
-                AES_set_encrypt_key(curKey1->key, aes, &enc_key);
                 AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &enc_key, iv_cur, AES_ENCRYPT);
                 cnt += 32;
+
+            } else {
+                cnt = read(dev, (void*) &(buf), 1518);
             }
             sendto(sock, &buf, cnt, 0, &addr.a, slen);
-            do_debug("TAP2NET: sended %d bytes\n",cnt);
-            if(aes){
+            do_debug("TAP2NET: sended %d bytes\n", cnt);
+            if (aes) {
                 if (curKey1->usage > ppk) {
+                    int keychanged = 0;
                     do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
                     if (!isEmpty(q1)) {
                         curKey1 = Dequeue(q1);
+                        keychanged = 1;
                     } else {
                         getLastKey();
                         if (isEmpty(q1)) {
@@ -467,7 +490,11 @@ int main(int argc, char **argv) {
                         } else {
                             curKey1 = Dequeue(q1);
                             do_debug("TAP2NET: New key 3\n");
+                            keychanged = 1;
                         }
+                    }
+                    if (keychanged) {
+                        AES_set_encrypt_key(curKey1->key, aes, &enc_key);
                     }
                 }
             }
@@ -475,13 +502,19 @@ int main(int argc, char **argv) {
 
         if (FD_ISSET(sock, &rfds)) {
             cnt = recvfrom(sock, &buf, 2000, 0, &from.a, &slen);
-            do_debug("NET2TAP: received %d bytes\n",cnt);
-
-            if (curKey2 == NULL) {
-                if (isEmpty(q2)) {
-                    continue;
-                } else {
-                    curKey2 = Dequeue(q2);
+            do_debug("NET2TAP: received %d bytes\n", cnt);
+            if (aes) {
+                    int keychanged = 0;
+                if (curKey2 == NULL) {
+                    if (isEmpty(q2)) {
+                        continue;
+                    } else {
+                        curKey2 = Dequeue(q2);
+                        keychanged = 1;
+                    }
+                    if (keychanged) {
+                    AES_set_decrypt_key(curKey2->key, aes, &dec_key);
+                    }
                 }
             }
             int address_ok = 0;
@@ -511,44 +544,47 @@ int main(int argc, char **argv) {
                     mdecrypt_generic(td, buf, cnt);
                     mcrypt_enc_set_state(td, enc_state, enc_state_size);
                     write(dev, (void*) &buf, cnt);
-                    do_debug("NET2TAP: sended %d bytes\n",cnt);
+                    do_debug("NET2TAP: sended %d bytes\n", cnt);
                 } else if (aes) {
                     bool toexit = false;
+                    int keychanged = 0;
                     while (memcmp(buf, curKey2->sha, 32) != 0) {
                         if (isEmpty(q2)) {
                             int i;
-                            printf("\nSHAbuf:\n");
+                            do_debug("\nSHAbuf:\n");
                             for (i = 0; i < 32; i++) {
-                                printf("%02X", buf[i]);
+                                do_debug("%02X", buf[i]);
                             }
-                            printf("\n");
-                            fflush(stdout);
+                            do_debug("\n");
                             if (getKeyBySha(buf) == false) {
-                                printf("NET2TAP: ERROR no sha\n");
+                                do_debug("NET2TAP: ERROR no sha\n");
                                 toexit = true;
                                 break;
                                 //sleep(1);
                             }
-                            printf("\n");
-                            printf("\nSHAcur:\n");
+                            do_debug("\nSHAcur:\n");
                             for (i = 0; i < 32; i++) {
-                                printf("%02X", curKey2->sha[i]);
+                                do_debug("%02X", curKey2->sha[i]);
                             }
-                            printf("\n");
-                            printf("GETNEW\n");
+                            do_debug("\nGETNEW\n");
                             if (isEmpty(q2)) {
                                 do_debug("NET2TAP: No keys\n");
-                                sleep(1);
+                                usleep(100);
                             } else {
                                 curKey2 = Dequeue(q2);
+                                keychanged = 1;
                             }
                         } else {
                             curKey2 = Dequeue(q2);
                             do_debug("NET2TAP: New key\n");
+                            keychanged = 1;
                         }
                     }
                     if (toexit) {
                         continue;
+                    }
+                    if (keychanged) {
+                    AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     }
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     cnt -= 32;
@@ -558,18 +594,14 @@ int main(int argc, char **argv) {
                     } else {
                         cnt = cnt;
                     }
-                    AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &dec_key, iv_cur, AES_DECRYPT);
-                    memcpy(&cnt,buf+32,2);
+                    memcpy(&cnt, buf + 32, 2);
                     write(dev, (void*) &(*(buf + 34)), cnt);
-                    do_debug("NET2TAP: sended %d bytes\n",cnt);
+                    do_debug("NET2TAP: sended %d bytes\n", cnt);
+                } else {
+                    write(dev, (void*) &buf, cnt);
                 }
             }
         }
-    }
-
-    if (blocksize) {
-        mcrypt_generic_deinit(td);
-        mcrypt_module_close(td);
     }
 }

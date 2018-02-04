@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "keyqueue.h"
 #include "sha3.h"
+#include <string.h>
 
 
 #define TRUE  1

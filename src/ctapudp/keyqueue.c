@@ -44,7 +44,7 @@ KEY *ConstructKey(uint8_t *buf) {
     return ConstructKeyUsage(buf,0);
 }
 
-KEY *ConstructKeyUsage(uint8_t *buf, uint8_t usage) {    
+KEY *ConstructKeyUsage(uint8_t *buf, uint16_t usage) {    
     KEY *key = (KEY*) malloc(sizeof (KEY));
     if (key == NULL) {
         return NULL;

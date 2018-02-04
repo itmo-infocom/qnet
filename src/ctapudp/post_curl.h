@@ -20,6 +20,7 @@ extern "C" {
 
 int curl_get_key(char *postthis, bool newkey);
 int curl_init_addr(char* _addr, int len);
+void curl_clear();
 
 
 #ifdef __cplusplus

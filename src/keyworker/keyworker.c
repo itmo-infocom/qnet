@@ -1,4 +1,5 @@
 #include <stdio.h> 
+#include <signal.h>
 #include <stdlib.h> 
 #include <string.h> 
 #include <stdbool.h>
@@ -303,8 +304,16 @@ KEY_IN_DB *getLastKey(DB *db) {
     return k;
 }
 
-int main(int argc, char *argv[]) {
+struct MHD_Daemon *my_daemon;
 
+void intHandler(int dummy) {
+    printf("\nEXIT\n");    
+    MHD_stop_daemon(my_daemon);
+    dbhandle->close(dbhandle, 0);
+    exit(0);
+}
+int main(int argc, char *argv[]) {
+    signal(SIGINT, intHandler);
     fprintf(stdout, "Starting\n");
     fflush(stdout);
     int tap_fd, option;
@@ -403,14 +412,14 @@ int main(int argc, char *argv[]) {
         my_err("Too many options!\n");
         usage();
     }*/
-    struct MHD_Daemon *daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,*/MHD_USE_SELECT_INTERNALLY, //MHD_USE_EPOLL_LINUX_ONLY,
+    my_daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,*/MHD_USE_SELECT_INTERNALLY, //MHD_USE_EPOLL_LINUX_ONLY,
             portCtrl,
             NULL,
             NULL,
             &ahc_echo,
             NULL,
             MHD_OPTION_END);
-    if (daemon == NULL) {
+    if (my_daemon == NULL) {
         my_err("Error in libmicrohttpd\n");
     }
 
@@ -419,12 +428,9 @@ int main(int argc, char *argv[]) {
         if (toclose == 1) {
             break;
         } else {
-            usleep(1);
+            usleep(10);
         }
     }
-    MHD_stop_daemon(daemon);
-
-    dbhandle->close(dbhandle, 0);
     //DestructQueue(q1);
     //DestructQueue(q2);
     return (0);

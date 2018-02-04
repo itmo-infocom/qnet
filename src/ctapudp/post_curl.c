@@ -33,9 +33,14 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
   return realsize;
 }
 
-int curl_init_addr(char* _addr, int len){
+int curl_init_addr(char* _addr, int len){ 
+    curl_global_init(CURL_GLOBAL_ALL);
     memcpy(addr,_addr,len);
     return 0;
+}
+
+void curl_clear(){   
+    curl_global_cleanup();
 }
  
 char* curl_get_key(char *postthis, bool newkey)
@@ -47,8 +52,6 @@ char* curl_get_key(char *postthis, bool newkey)
  
   chunk.memory = malloc(1);  /* will be grown as needed by realloc above */ 
   chunk.size = 0;    /* no data at this point */ 
- 
-  curl_global_init(CURL_GLOBAL_ALL);
   curl = curl_easy_init();
   if(curl) { 
     curl_easy_setopt(curl, CURLOPT_URL, addr);
@@ -85,9 +88,6 @@ char* curl_get_key(char *postthis, bool newkey)
  
     /* always cleanup */ 
     curl_easy_cleanup(curl);
- 
-    /* we're done with libcurl, so clean it up */ 
-    curl_global_cleanup();
     if(realkey){
         memcpy(key,chunk.memory,64);
         free(chunk.memory);

@@ -10,7 +10,7 @@ extern "C" {
 typedef struct KEY {
     uint8_t sha[32];
     uint8_t key[32];
-    uint8_t usage;
+    uint16_t usage;
     struct KEY *prev;
 } KEY;
 
@@ -22,7 +22,7 @@ typedef struct Queue {
 } Queue;
 
 KEY *ConstructKey(uint8_t *buf);
-KEY *ConstructKeyUsage(uint8_t *buf,uint8_t usage);
+KEY *ConstructKeyUsage(uint8_t *buf,uint16_t usage);
 Queue *ConstructQueue(int limit);
 void DestructQueue(Queue *queue);
 int Enqueue(Queue *pQueue, KEY *item);
