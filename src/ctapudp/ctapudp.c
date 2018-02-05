@@ -449,9 +449,7 @@ int main(int argc, char **argv) {
                     cnt = cnt;
                 }*/
                 memcpy(iv_cur, iv, AES_BLOCK_SIZE);
-                printf("\nWAS SIZE: %d\n",cnt);
                 int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
-                printf("\nNEW SIZE: %d\n",newcnt);
                 cnt = newcnt + 32;
             } else {
                 cnt = read(dev, (void*) &(buf), 1518);
