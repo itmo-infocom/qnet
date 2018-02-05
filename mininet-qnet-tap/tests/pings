@@ -1,0 +1,10 @@
+#!/bin/sh
+
+for i in $(seq 6 15) 
+do
+ echo ping -c 10 -M dont -s $((2**$i-8)) 10.0.0.2
+ ping -c 10 -M dont -s $((2**$i-8)) 10.0.0.2
+done
+
+echo ping -c 10 -M dont -s 65507 10.0.0.2
+ping -c 10 -M dont -s 65507 10.0.0.2

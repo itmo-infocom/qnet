@@ -1,3 +1,11 @@
+mininet-qnet-tap/data/*.dat
+mininet-qnet-tap/*.db
+src/ctap/ctap
+src/ctapraw/ctapraw
+src/ctapudp/ctapudp
+src/keyworker/*.db
+src/keyworker/keyworker
+
 # Backup files
 *~
 .~lock*
