@@ -13,7 +13,7 @@
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
-    <conf name="Default" type="0">
+    <conf name="Default" type="0" platformSpecific="true">
       <toolsSet>
         <developmentServer>giggsoff@192.168.1.199:22</developmentServer>
         <platform>2</platform>

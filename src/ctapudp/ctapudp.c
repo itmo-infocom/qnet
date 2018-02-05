@@ -84,7 +84,7 @@ bool getKeyBySha(uint8_t* sha) {
         }
         printf("\n");
         printf("NEWKEYBYSHAOK\n");
-        KEY *k1 = ConstructKey(buff);
+        KEY *k1 = ConstructKeySha(buff, sha);
         KEY *k2 = CopyKey(k1);
         Enqueue(q1, k1);
         Enqueue(q2, k2);
@@ -146,6 +146,45 @@ void intHandler(int dummy) {
     exit(0);
 }
 
+void handleErrors(void) {
+    ERR_print_errors_fp(stderr);
+    abort();
+}
+
+int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
+        unsigned char *iv, unsigned char *ciphertext) {
+    EVP_CIPHER_CTX *ctx;
+    int len;
+    int ciphertext_len;
+    if (!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
+    if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
+        handleErrors();
+    if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
+        handleErrors();
+    ciphertext_len = len;
+    if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) handleErrors();
+    ciphertext_len += len;
+    EVP_CIPHER_CTX_free(ctx);
+    return ciphertext_len;
+}
+
+int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
+        unsigned char *iv, unsigned char *plaintext) {
+    EVP_CIPHER_CTX *ctx;
+    int len;
+    int plaintext_len;
+    if (!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
+    if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
+        handleErrors();
+    if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
+        handleErrors();
+    plaintext_len = len;
+    if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) handleErrors();
+    plaintext_len += len;
+    EVP_CIPHER_CTX_free(ctx);
+    return plaintext_len;
+}
+
 int main(int argc, char **argv) {
     signal(SIGINT, intHandler);
     uint16_t ppk = 100;
@@ -165,9 +204,6 @@ int main(int argc, char **argv) {
 #ifndef __NetBSD__
     struct ifreq ifr;
 #endif
-
-    //printf("IN: %s\n", text);
-    AES_KEY enc_key, dec_key;
     char *key;
     int keysize = 32; /* 256 bits == 32 bytes */
     char enc_state[1024];
@@ -175,61 +211,6 @@ int main(int argc, char **argv) {
     char* tun_device = "/dev/net/tun";
     char* dev_name = "tun%d";
     int tuntap_flag = IFF_TAP;
-    /*
-    if (getenv("TUN_DEVICE")) {
-        tun_device = getenv("TUN_DEVICE");
-    }
-    if (getenv("DEV_NAME")) {
-        dev_name = getenv("DEV_NAME");
-    }
-
-    if (getenv("MCRYPT_KEYFILE")) {
-        if (getenv("MCRYPT_KEYSIZE")) {
-            keysize = atoi(getenv("MCRYPT_KEYSIZE")) / 8;
-        }
-        key = calloc(1, keysize);
-        FILE* keyf = fopen(getenv("MCRYPT_KEYFILE"), "r");
-        if (!keyf) {
-            perror("fopen keyfile");
-            return 10;
-        }
-        memset(key, 0, keysize);
-        fread(key, 1, keysize, keyf);
-        fclose(keyf);
-
-        char* algo = "twofish";
-        char* mode = "cbc";
-
-        if (getenv("MCRYPT_ALGO")) {
-            algo = getenv("MCRYPT_ALGO");
-        }
-        if (getenv("MCRYPT_MODE")) {
-            mode = getenv("MCRYPT_MODE");
-        }
-
-
-        td = mcrypt_module_open(algo, NULL, mode, NULL);
-        if (td == MCRYPT_FAILED) {
-            fprintf(stderr, "mcrypt_module_open failed algo=%s mode=%s keysize=%d\n", algo, mode, keysize);
-            return 11;
-        }
-        blocksize = mcrypt_enc_get_block_size(td);
-        //block_buffer = malloc(blocksize);
-
-        mcrypt_generic_init(td, key, keysize, NULL);
-
-        enc_state_size = sizeof enc_state;
-        mcrypt_enc_get_state(td, enc_state, &enc_state_size);
-    } else if (getenv("AES_KEYSIZE")) {
-        aes = atoi(getenv("AES_KEYSIZE"));
-        if (getenv("KEYWORKER_IP")) {
-            memcpy(key_ip, getenv("KEYWORKER_IP"), 30);
-        }
-        if (getenv("KEYWORKER_PORT")) {
-            port_key = atoi(getenv("KEYWORKER_PORT"));
-        }
-    }
-     */
     tuntap_flag = IFF_TUN;
     int option;
     int ip_family = AF_INET;
@@ -454,7 +435,6 @@ int main(int argc, char **argv) {
                         keychanged = 1;
                     }
                     if (keychanged) {
-                        AES_set_encrypt_key(curKey1->key, aes, &enc_key);
                     }
                 }
                 curKey1->usage++;
@@ -462,15 +442,17 @@ int main(int argc, char **argv) {
                 memcpy(buf + 32, &cnt, 2);
                 memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                 cnt += 2;
-                int diff = cnt % 128;
+                /*int diff = cnt % 128;
                 if (diff != 0) {
                     cnt = cnt + (128 - diff);
                 } else {
                     cnt = cnt;
-                }
-                AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &enc_key, iv_cur, AES_ENCRYPT);
-                cnt += 32;
-
+                }*/
+                memcpy(iv_cur, iv, AES_BLOCK_SIZE);
+                printf("\nWAS SIZE: %d\n",cnt);
+                int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
+                printf("\nNEW SIZE: %d\n",newcnt);
+                cnt = newcnt + 32;
             } else {
                 cnt = read(dev, (void*) &(buf), 1518);
             }
@@ -494,7 +476,7 @@ int main(int argc, char **argv) {
                         }
                     }
                     if (keychanged) {
-                        AES_set_encrypt_key(curKey1->key, aes, &enc_key);
+                        //AES_set_encrypt_key(curKey1->key, aes, &enc_key);
                     }
                 }
             }
@@ -513,7 +495,7 @@ int main(int argc, char **argv) {
                         keychanged = 1;
                     }
                     if (keychanged) {
-                        AES_set_decrypt_key(curKey2->key, aes, &dec_key);
+                        //AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     }
                 }
             }
@@ -588,17 +570,18 @@ int main(int argc, char **argv) {
                         continue;
                     }
                     if (keychanged) {
-                        AES_set_decrypt_key(curKey2->key, aes, &dec_key);
+                        //AES_set_decrypt_key(curKey2->key, aes, &dec_key);
                     }
-                    memcpy(iv_cur, iv, AES_BLOCK_SIZE);
+                    //memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     cnt -= 32;
-                    int diff = cnt % 128;
+                    /*int diff = cnt % 128;
                     if (diff != 0) {
                         cnt = cnt + (128 - diff);
                     } else {
                         cnt = cnt;
-                    }
-                    AES_cbc_encrypt((buf + 32), (buf + 32), cnt, &dec_key, iv_cur, AES_DECRYPT);
+                    }*/
+                    memcpy(iv_cur, iv, AES_BLOCK_SIZE);
+                    decrypt(buf + 32, cnt, curKey2->key, iv_cur, buf + 32);
                     memcpy(&cnt, buf + 32, 2);
                     write(dev, (void*) &(*(buf + 34)), cnt);
                     do_debug("NET2TAP: sended %d bytes\n", cnt);

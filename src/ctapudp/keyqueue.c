@@ -6,7 +6,7 @@
 
 
 #define TRUE  1
-#define FALSE	0
+#define FALSE 0
 
 
 Queue *ConstructQueue(int limit);
@@ -31,52 +31,62 @@ Queue *ConstructQueue(int limit) {
     return queue;
 }
 
-KEY *CopyKey(KEY *k){
+KEY *CopyKey(KEY *k) {
     KEY *key = (KEY*) malloc(sizeof (KEY));
     if (key == NULL) {
         return NULL;
     }
-    memcpy(key, k, sizeof (KEY));    
+    memcpy(key, k, sizeof (KEY));
     return key;
 }
 
-KEY *ConstructKey(uint8_t *buf) {    
-    return ConstructKeyUsage(buf,0);
+KEY *ConstructKey(uint8_t *buf) {
+    return ConstructKeyUsage(buf, 0);
 }
 
-KEY *ConstructKeyUsage(uint8_t *buf, uint16_t usage) {    
+KEY *ConstructKeySha(uint8_t *buf, uint8_t *sha) {
+    return ConstructKeyShaUsage(buf, sha, 0);
+}
+
+KEY *ConstructKeyUsage(uint8_t *buf, uint16_t usage) {
     KEY *key = (KEY*) malloc(sizeof (KEY));
     if (key == NULL) {
         return NULL;
     }
-    key->usage=usage;
-    int i;
-    for(i=0;i<32;i++){
-        key->key[i]=buf[i];
-    }
-    sha3(key->key,32,key->sha,32);
+    key->usage = usage;
+    memcpy(key->key, buf, 32);
+    sha3(key->key, 32, key->sha, 32);
     return key;
 }
 
-void PrintKey(KEY *k){
+KEY *ConstructKeyShaUsage(uint8_t *buf, uint8_t *sha, uint16_t usage) {
+    KEY *key = (KEY*) malloc(sizeof (KEY));
+    if (key == NULL) {
+        return NULL;
+    }
+    key->usage = usage;
+    memcpy(key->key, buf, 32);
+    memcpy(key->sha, sha, 32);
+    return key;
+}
+
+void PrintKey(KEY *k) {
     printf("<-KEY->\n");
     int i;
     printf("KEY->\n");
-    for (i = 0; i < 32; i++)
-    {
+    for (i = 0; i < 32; i++) {
         //if (i > 0) printf(":");
         printf("%02X", k->key[i]);
     }
     printf("\n");
     printf("SHA->\n");
-    for (i = 0; i < 32; i++)
-    {
+    for (i = 0; i < 32; i++) {
         //if (i > 0) printf(":");
         printf("%02X", k->sha[i]);
     }
     printf("\n");
     printf("Usage->\n");
-    printf("%d\n",k->usage);
+    printf("%d\n", k->usage);
     printf("<-KEY->\n");
 }
 
