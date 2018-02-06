@@ -471,9 +471,10 @@ int main(int argc, char *argv[]) {
         my_err("Error in libmicrohttpd\n");
         return 1;
     }
-
     fflush(stdout);
-    (void) getc(stdin);
+    while(1){
+        (void) getc(stdin);
+    }
     intHandler(0);
     //DestructQueue(q1);
     //DestructQueue(q2);
