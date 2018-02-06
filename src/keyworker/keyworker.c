@@ -1,41 +1,37 @@
-#include <stdio.h> 
+#include <stdio.h>
 #include <signal.h>
-#include <stdlib.h> 
-#include <string.h> 
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
-#include <unistd.h> 
-#include <net/if.h> 
-#include <linux/if_tun.h> 
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <sys/ioctl.h> 
-#include <sys/stat.h> 
-#include <fcntl.h> 
-#include <arpa/inet.h> 
-#include <sys/select.h> 
-#include <sys/time.h> 
-#include <errno.h> 
+#include <unistd.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <errno.h>
 #include <stdarg.h>
 #include "sha3.h"
 #include "keyqueue.h"
 #include <microhttpd.h>
 #include <db.h>
 /* buffer for reading from tun/tap interface, must be >= 1500 */
-#define BUFSIZE 2000 
-#define CLIENT 0 
-#define SERVER 1 
+#define BUFSIZE 2000
+#define CLIENT 0
+#define SERVER 1
 #define PORT 55555
 #define PORTC 55554
-
+#define NUMBER_OF_THREADS 2
 DB *dbhandle; // DB handle
-int debug;
 char *progname;
-int toclose = 0;
+volatile int toclose = 0;
 
-char response_buffer[64];
-
-const char * response_data = "OK\0";
-int debug = 0;
+volatile int debug = 0;
 
 typedef struct {
     uint8_t key[32];
@@ -52,6 +48,7 @@ struct postStatus {
     char *buff;
     int count;
 };
+const char * response_data = "OK\0";
 
 static int ahc_echo(void * cls,
         struct MHD_Connection * connection,
@@ -61,6 +58,9 @@ static int ahc_echo(void * cls,
         const char * upload_data,
         size_t * upload_data_size,
         void ** ptr) {
+
+    char response_buffer[64];
+
     const char * page = cls;
     struct MHD_Response * response;
     int ret;
@@ -89,14 +89,14 @@ static int ahc_echo(void * cls,
         } else {
             if (strncmp(post->buff, "quit", 4) == 0) {
                 toclose_local = 1;
-                response_buffer[0] = 'O';
-                response_buffer[1] = 'K';
-                response = MHD_create_response_from_buffer(2,
-                        (void*) response_buffer,
+                response = MHD_create_response_from_buffer(strlen(response_data),
+                        (void*) response_data,
                         MHD_RESPMEM_PERSISTENT);
             } else
                 if (strncmp(post->buff, "last", 4) == 0) {
                 KEY_IN_DB *lastKey = getLastKey(dbhandle);
+                if (lastKey == NULL)
+                    return MHD_NO;
                 if (debug) {
                     PrintKey(ConstructKeyUsage(lastKey->key, lastKey->usage));
                 }
@@ -106,7 +106,7 @@ static int ahc_echo(void * cls,
                 }
                 response = MHD_create_response_from_buffer(sizeof (response_buffer),
                         (void *) response_buffer,
-                        MHD_RESPMEM_PERSISTENT);
+                        MHD_RESPMEM_MUST_COPY);
                 to_sync = 1;
                 //free(lastKey);
             } else
@@ -115,7 +115,7 @@ static int ahc_echo(void * cls,
                 uint8_t sha[32];
                 int i;
                 for (i = 0; i < 32; i++) {
-                    sscanf(post->buff + 3 + i * 2, "%2" SCNx8, &(sha[i]));
+                    sscanf(post->buff + 3 + i * 2, "%02X", &(sha[i]));
                 }
                 if (debug) {
                     for (i = 0; i < 32; i++) {
@@ -130,10 +130,10 @@ static int ahc_echo(void * cls,
                     for (i = 0; i < 32; i++) {
                         sprintf(response_buffer + i * 2, "%02X", lastKey->key[i]);
                     }
+                    free(lastKey);
                     response = MHD_create_response_from_buffer(sizeof (response_buffer),
                             (void *) response_buffer,
-                            MHD_RESPMEM_PERSISTENT);
-                    free(lastKey);
+                            MHD_RESPMEM_MUST_COPY);
                 } else {
                     response = NULL;
                 }
@@ -143,7 +143,7 @@ static int ahc_echo(void * cls,
                 bool isadded = false;
                 for (j = 0; j <= post->count - 64; j += 64) {
                     for (i = 0; i < 32; i++) {
-                        sscanf((post->buff + j + i * 2), "%2" SCNx8, &(key[i]));
+                        sscanf((post->buff + j + i * 2), "%02X", &(key[i]));
                     }
                     if (debug) {
                         printf("\n j=%d \n", j);
@@ -163,10 +163,8 @@ static int ahc_echo(void * cls,
                         fprintf(stdout, "NEW KEYS\n");
                         fflush(stdout);
                     }
-                    response_buffer[0] = 'O';
-                    response_buffer[1] = 'K';
-                    response = MHD_create_response_from_buffer(2,
-                            (void*) response_buffer,
+                    response = MHD_create_response_from_buffer(strlen(response_data),
+                            (void*) response_data,
                             MHD_RESPMEM_PERSISTENT);
                     to_sync = 1;
                 } else {
@@ -180,13 +178,14 @@ static int ahc_echo(void * cls,
 
     if (post != NULL)
         free(post);
-    ret = MHD_queue_response(connection,
-            MHD_HTTP_OK,
-            response);
-    MHD_destroy_response(response);
     if (to_sync == 1) {
         dbhandle->sync(dbhandle, 0);
     }
+    ret = MHD_queue_response(connection,
+            MHD_HTTP_OK,
+            response);
+    if (response)
+        MHD_destroy_response(response);
 
     if (toclose_local == 1) {
         toclose = 1;
@@ -291,29 +290,32 @@ KEY_IN_DB *getLastKey(DB *db) {
     data_dbt.flags = DB_DBT_MALLOC;
     db->cursor(db, NULL, &dbc, 0);
     int ret;
-    bool flag = false;
+    int flag = 0;
+    int isok = 0;
     for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
             ret == 0;
             ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
-        memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
-        if (k->usage != 0) {
+        if (((KEY_IN_DB*) (data_dbt.data))->usage != 0) {
             if (flag) {
                 ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
-                k = data_dbt.data;
+                memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
+                isok = 1;
                 break;
             } else {
                 break;
             }
         } else {
-            flag = true;
+            flag = 1;
         }
     }
-    if (k != NULL) {
-        if (k->usage < 250) {
-            k->usage++;
-            ((KEY_IN_DB*) data_dbt.data)->usage = k->usage;
-            dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
-        }
+    if (!isok) {
+        ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
+        memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
+    }
+    if (k->usage < 250) {
+        k->usage++;
+        ((KEY_IN_DB*) data_dbt.data)->usage = k->usage;
+        dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
     }
     free(data_dbt.data);
     return k;
@@ -323,8 +325,13 @@ struct MHD_Daemon *my_daemon;
 
 void intHandler(int dummy) {
     printf("\nEXIT\n");
-    MHD_stop_daemon(my_daemon);
-    dbhandle->close(dbhandle, 0);
+    if (my_daemon) {
+        MHD_stop_daemon(my_daemon);
+    }
+    if (dbhandle) {
+        dbhandle->sync(dbhandle, 0);
+        dbhandle->close(dbhandle, 0);
+    }
     exit(0);
 }
 
@@ -438,6 +445,9 @@ int main(int argc, char *argv[]) {
 
     /* Check command line options */
 
+#if EPOLL_SUPPORT
+    fprintf("EPOLL\n");
+#endif
     fflush(stdout);
     /*argv += optind;
     argc -= optind;
@@ -445,25 +455,26 @@ int main(int argc, char *argv[]) {
         my_err("Too many options!\n");
         usage();
     }*/
-    my_daemon = MHD_start_daemon(/*MHD_USE_POLL_INTERNALLY,*/MHD_USE_SELECT_INTERNALLY, //MHD_USE_EPOLL_LINUX_ONLY,
+    my_daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY | MHD_SUPPRESS_DATE_NO_CLOCK
+            | MHD_USE_EPOLL_LINUX_ONLY | MHD_USE_EPOLL_TURBO
+            ,
             portCtrl,
             NULL,
             NULL,
             &ahc_echo,
             NULL,
+            MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
+            MHD_OPTION_THREAD_POOL_SIZE, (unsigned int) NUMBER_OF_THREADS,
+            MHD_OPTION_CONNECTION_LIMIT, (unsigned int) 4,
             MHD_OPTION_END);
     if (my_daemon == NULL) {
         my_err("Error in libmicrohttpd\n");
+        return 1;
     }
 
     fflush(stdout);
-    while (1) {
-        if (toclose == 1) {
-            break;
-        } else {
-            usleep(20);
-        }
-    }
+    (void) getc(stdin);
+    intHandler(0);
     //DestructQueue(q1);
     //DestructQueue(q2);
     return (0);
