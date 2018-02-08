@@ -14,7 +14,7 @@ iperf_tcp_clt load_traffic[KM] -- client part of iperf utility which sending loa
 
 iperf_tcp_srv -- server part of iperf utility.
 
-tcp.py -- creates gnuplot data-file from iperf_tcp_srv's logs.
+tcp.py load_traffic -- creates gnuplot data-file from iperf_tcp_srv's logs for load traffic in Kibits/sec.
 
 tcp.plot -- gnuplot script for bandwidth graph drawing.
 
@@ -24,7 +24,7 @@ iperf_udp_clt load_traffic[KM] -- client part of iperf utility which sending loa
 
 iperf_udp_srv -- server part of iperf utility.
 
-udp.py -- creates gnuplot data-file from iperf_udp_srv's logs.
+udp.py load_traffic -- creates gnuplot data-file from iperf_udp_srv's logs for load traffic in Kibits/sec.
 
 udp-bw.plot -- gnuplot script for bandwidth graph drawing.
 
