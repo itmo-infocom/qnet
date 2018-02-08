@@ -20,6 +20,7 @@
 #include "keyqueue.h"
 #include <microhttpd.h>
 #include <db.h>
+#include <libgen.h>
 /* buffer for reading from tun/tap interface, must be >= 1500 */
 #define BUFSIZE 2000
 #define CLIENT 0
@@ -28,6 +29,7 @@
 #define PORTC 55554
 #define NUMBER_OF_THREADS 2
 DB *dbhandle; // DB handle
+DB_ENV *dbenv = NULL;
 char *progname;
 volatile int toclose = 0;
 
@@ -61,6 +63,7 @@ static int ahc_echo(void * cls,
 
     char response_buffer[64];
 
+    DB_TXN *t;
     const char * page = cls;
     struct MHD_Response * response;
     int ret;
@@ -179,7 +182,7 @@ static int ahc_echo(void * cls,
     if (post != NULL)
         free(post);
     if (to_sync == 1) {
-        dbhandle->sync(dbhandle, 0);
+        //dbhandle->sync(dbhandle, 0);
     }
     ret = MHD_queue_response(connection,
             MHD_HTTP_OK,
@@ -229,6 +232,7 @@ void usage(void) {
 }
 
 int putKey(KEY *k, DB *db) {
+    DB_TXN *t;
     size_t len;
     DBT db_key, db_data;
     KEY_IN_DB *key_in = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
@@ -248,7 +252,18 @@ int putKey(KEY *k, DB *db) {
     db_key.size = sizeof (key_buffer);
     db_data.data = key_in;
     db_data.size = sizeof (uint8_t)*37;
-    int ret = db->put(db, NULL, &db_key, &db_data, DB_NOOVERWRITE);
+    int ret = 0;
+    if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
+        ret = db->put(db, NULL, &db_key, &db_data, DB_NOOVERWRITE);
+        if (t->commit(t, 0) != 0) {
+            printf("ERROR IN COMMIT!!!\n");
+        }
+    } else {
+        if (t != NULL)
+            (void)t->abort(t);
+        printf("ERROR IN TRANSACTION!!!\n");
+        return -1;
+    }
     if (ret != 0) {
         my_err("Key ID exists\n");
     }
@@ -257,6 +272,7 @@ int putKey(KEY *k, DB *db) {
 }
 
 KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
+    DB_TXN *t;
     KEY_IN_DB *keyret = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
     if (keyret == NULL) {
         return NULL;
@@ -270,13 +286,24 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
     //data.data = &key_in;
     //data.ulen = sizeof(KEY_IN_DB);
     //data.flags = DB_DBT_USERMEM;
-    int ret = db->get(db, NULL, &key, &data, 0);
-    if (ret == 0) {
-        memcpy(keyret, data.data, sizeof (KEY_IN_DB));
-        free(data.data);
-        return keyret;
+    if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
+        int ret = db->get(db, t, &key, &data, 0);
+
+        if (t->commit(t, 0) != 0) {
+            printf("ERROR IN COMMIT!!!\n");
+        }
+        if (ret == 0) {
+            memcpy(keyret, data.data, sizeof (KEY_IN_DB));
+            free(data.data);
+            return keyret;
+        } else {
+            my_err("NOT FOUND\n");
+            return NULL;
+        }
     } else {
-        my_err("NOT FOUND\n");
+        if (t != NULL)
+            (void)t->abort(t);
+        printf("ERROR IN TRANSACTION!!!\n");
         return NULL;
     }
 }
@@ -284,40 +311,51 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
 KEY_IN_DB *getLastKey(DB *db) {
     DBT key_dbt, data_dbt;
     DBC *dbc;
+    DB_TXN *t;
     KEY_IN_DB *k = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
     memset(&key_dbt, 0, sizeof (DBT));
     memset(&data_dbt, 0, sizeof (DBT));
     data_dbt.flags = DB_DBT_MALLOC;
-    db->cursor(db, NULL, &dbc, 0);
-    int ret;
-    int flag = 0;
-    int isok = 0;
-    for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
-            ret == 0;
-            ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
-        if (((KEY_IN_DB*) (data_dbt.data))->usage != 0) {
-            if (flag) {
-                ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
-                memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
-                isok = 1;
-                break;
+    if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
+        db->cursor(db, t, &dbc, 0);
+        int ret;
+        int flag = 0;
+        int isok = 0;
+        for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
+                ret == 0;
+                ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
+            if (((KEY_IN_DB*) (data_dbt.data))->usage != 0) {
+                if (flag) {
+                    ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
+                    memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
+                    isok = 1;
+                    break;
+                } else {
+                    break;
+                }
             } else {
-                break;
+                flag = 1;
             }
-        } else {
-            flag = 1;
         }
+        if (!isok) {
+            ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
+            memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
+        }
+        if (k->usage < 250) {
+            k->usage++;
+            ((KEY_IN_DB*) data_dbt.data)->usage = k->usage;
+            dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
+        }
+        free(data_dbt.data);
+        if (t->commit(t, 0) != 0) {
+            printf("ERROR IN COMMIT!!!\n");
+        }
+    } else {
+        if (t != NULL)
+            (void)t->abort(t);
+        printf("ERROR IN TRANSACTION!!!\n");
+        return NULL;
     }
-    if (!isok) {
-        ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
-        memcpy(k, data_dbt.data, sizeof (KEY_IN_DB));
-    }
-    if (k->usage < 250) {
-        k->usage++;
-        ((KEY_IN_DB*) data_dbt.data)->usage = k->usage;
-        dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
-    }
-    free(data_dbt.data);
     return k;
 }
 
@@ -331,6 +369,7 @@ void intHandler(int dummy) {
     if (dbhandle) {
         dbhandle->sync(dbhandle, 0);
         dbhandle->close(dbhandle, 0);
+        dbenv->close(dbenv, 0);
     }
     exit(0);
 }
@@ -357,6 +396,7 @@ int main(int argc, char *argv[]) {
     uint8_t key[1][32] = {
         {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}
     };
+    u_int32_t envFlags;
     int ret = 0;
     char dbname[255] = "keys.db";
 
@@ -380,8 +420,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if ((ret = db_env_create(&dbenv, 0)) != 0) {
+        printf("%s: %s\n", progname, db_strerror(ret));
+        return (ret);
+    }
+    if ((ret =
+            dbenv->open(dbenv, dirname(dbname), DB_CREATE | DB_RECOVER | DB_INIT_LOCK |
+            DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_THREAD, 0)) != 0) {
+        dbenv->err(dbenv, ret, "environment open: %s", dirname(dbname));
+        dbenv->close(dbenv, 0);
+        return (ret);
+    }
     // Initialize our DB handle
-    ret = db_create(&dbhandle, NULL, 0);
+    ret = db_create(&dbhandle, dbenv, 0);
     if (debug) {
         fprintf(stdout, "Creating\n");
         fflush(stdout);
@@ -395,7 +446,7 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "Created\n");
         fflush(stdout);
     }
-    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE | DB_THREAD, 0);
+    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE | DB_THREAD | DB_AUTO_COMMIT, 0);
     if (ret != 0) {
         fprintf(stdout, "Failed to open database file %s: %s\n", dbname, db_strerror(ret));
         fflush(stdout);
@@ -472,7 +523,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     fflush(stdout);
-    while(1){
+    while (1) {
         (void) getc(stdin);
     }
     intHandler(0);
