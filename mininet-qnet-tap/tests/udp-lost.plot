@@ -7,6 +7,7 @@ show title
 set output 'udp-lost.png'
 set xlabel "Load Traffic (Kbits/sec)"
 set ylabel "Lost Packages (%)"
-set xrange [0:1100]
+set xrange [0.9:1100]
+set logscale x
 plot "udp-raw_udp.dat" using 1:6:7 with errorlines, "udp-udp.dat" using 1:6:7 with errorlines, "udp-raw_tcp.dat" using 1:6:7 with errorlines, "udp-tcp.dat" using 1:6:7 with errorlines
 

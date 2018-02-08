@@ -7,6 +7,7 @@ show title
 set output 'pings.png'
 set xlabel "Package size (bytes)"
 set ylabel "Latency (ms)"
-set xrange [0:33000]
+set xrange [60:70000]
+set logscale x
 plot "pings-raw_udp.dat" using 1:2:3 with errorlines, "pings-udp.dat" using 1:2:3 with errorlines, "pings-raw_tcp.dat" using 1:2:3 with errorlines, "pings-tcp.dat" using 1:2:3 with errorlines
 
