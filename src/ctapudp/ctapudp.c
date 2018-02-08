@@ -30,6 +30,8 @@
 #include <curl/curl.h>
 #include "post_curl.h"
 
+#include "zlib.h"
+
 Queue *q1;
 Queue *q2;
 KEY *curKey1;
@@ -108,7 +110,7 @@ char *progname;
 void usage(void) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s -i <ifacename> [-s|-c <serverIP>] [-p <port>] [-k <port>] [-u|-a] [-d]\n", progname);
-    fprintf(stderr, "%s ./ctapudp -s 0.0.0.0 -p 3443 -q 127.0.0.1 -r 55554 -i udp0 -e 100 -a 1 -d 1\n", progname);
+    fprintf(stderr, "%s ./ctapudp -s 0.0.0.0 -p 3443 -q 127.0.0.1 -r 55554 -i udp0 -e 100 -a 1-d 1\n", progname);
     fprintf(stderr, "%s ./ctapudp -c 0.0.0.0 -p 0 -q 192.168.1.199 -r 55554 -t 192.168.1.199 -k 3443 -i udp0 -e 100 -a 1 -d 1\n", progname);
 
 
@@ -119,9 +121,10 @@ void usage(void) {
     fprintf(stderr, "-p <port>: port to listen on\n");
     fprintf(stderr, "-t <ip>: ip to connect\n");
     fprintf(stderr, "-k <port>: port to connect\n");
-    fprintf(stderr, "-a: use TAP or TUN (without parameter)\n");
-    fprintf(stderr, "-d: outputs debug information while running\n");
+    fprintf(stderr, "-a 1: use TAP or TUN (without parameter)\n");
+    fprintf(stderr, "-d 1: outputs debug information while running\n");
     fprintf(stderr, "-e <ppk>: use aes-cbc with key per packet\n");
+    fprintf(stderr, "-z <compress level (0-9)>: use gzip\n");
     fprintf(stderr, "-f <filepath>: use mcrypt with file\n");
     fprintf(stderr, "-q <ip>: ip to connect for keys\n");
     fprintf(stderr, "-r <port>: port to connect for keys\n");
@@ -185,8 +188,29 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     return plaintext_len;
 }
 
+uLong zip(unsigned char *input_data, int len, unsigned char *output_data, int level) {
+    if(level>9){
+        level = 9;
+    }else if(level<0){
+        level = 0;
+    }
+    unsigned long slen = len;
+    unsigned long buflen = 3000;
+    compress2((Bytef *) output_data, &buflen, (const Bytef *) input_data, slen, level);
+    return buflen;
+}
+
+uLong unzip(unsigned char *input_data, int len, unsigned char *output_data) {
+    unsigned long slen = len;
+    unsigned long buflen = 3000;
+    uncompress((Bytef *) output_data, &buflen, (const Bytef *) input_data, slen);
+    return buflen;
+}
+
 int main(int argc, char **argv) {
     signal(SIGINT, intHandler);
+    int gzip = 0;
+    int gziplevel = 5;
     uint16_t ppk = 100;
     progname = argv[0];
     unsigned char iv[] = {0xf5, 0x8c, 0x4c, 0x04, 0xd6, 0xe5, 0xf1, 0xba, 0x77, 0x9e, 0xab, 0xfb, 0x5f, 0x7b, 0xfb, 0xd6, 0x9c, 0xfc, 0x4e, 0x96, 0x7e, 0xdb, 0x80, 0x8d, 0x67, 0x9f, 0x77, 0x7b, 0xc6, 0x70, 0x2c, 0x7d};
@@ -200,6 +224,7 @@ int main(int argc, char **argv) {
 
     int dev, cnt, sock, slen;
     unsigned char buf[2000];
+    unsigned char bufzip[3000];
     union sockaddr_4or6 addr, from;
 #ifndef __NetBSD__
     struct ifreq ifr;
@@ -222,7 +247,7 @@ int main(int argc, char **argv) {
     char* rhost = NULL;
     char* rport = NULL;
     char* fcname = NULL;
-    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:")) > 0) {
+    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:z:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -246,6 +271,10 @@ int main(int argc, char **argv) {
                 break;
             case 'r':
                 port_key = atoi(optarg);
+                break;
+            case 'z':
+                gzip = 1;
+                gziplevel = atoi(optarg);
                 break;
             case 'p':
                 lport = optarg;
@@ -407,14 +436,21 @@ int main(int argc, char **argv) {
         if (ret < 0) continue;
 
         if (FD_ISSET(dev, &rfds)) {
+            cnt = read(dev, (void*) &(buf), 1518);
+            if (gzip) {
+                do_debug("PREZIPPED LENGTH: %lu\n", cnt);
+                uLong ziplength = zip(buf, cnt, bufzip, gziplevel);
+                do_debug("ZIPPED LENGTH: %lu\n", ziplength);
+                memcpy(buf, bufzip, ziplength);
+                cnt = ziplength;
+            }
             if (blocksize) {
-                cnt = read(dev, (void*) &(buf), 1518);
                 cnt = ((cnt - 1) / blocksize + 1) * blocksize; // pad to block size
                 mcrypt_generic(td, buf, cnt);
                 mcrypt_enc_set_state(td, enc_state, enc_state_size);
             } else
                 if (aes) {
-                cnt = read(dev, (void*) &(*(buf + 34)), 1518);
+                memmove((void*) &(*(buf + 34)), (void*) &(buf), cnt);
                 do_debug("TAP2NET: received %d bytes\n", cnt);
                 if (curKey1 == NULL) {
                     int keychanged = 0;
@@ -440,19 +476,10 @@ int main(int argc, char **argv) {
                 curKey1->usage++;
                 memcpy(buf, curKey1->sha, 32);
                 memcpy(buf + 32, &cnt, 2);
-                memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                 cnt += 2;
-                /*int diff = cnt % 128;
-                if (diff != 0) {
-                    cnt = cnt + (128 - diff);
-                } else {
-                    cnt = cnt;
-                }*/
                 memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                 int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
                 cnt = newcnt + 32;
-            } else {
-                cnt = read(dev, (void*) &(buf), 1518);
             }
             sendto(sock, &buf, cnt, 0, &addr.a, slen);
             do_debug("TAP2NET: sended %d bytes\n", cnt);
@@ -523,9 +550,11 @@ int main(int argc, char **argv) {
                     cnt = ((cnt - 1) / blocksize + 1) * blocksize; // pad to block size
                     mdecrypt_generic(td, buf, cnt);
                     mcrypt_enc_set_state(td, enc_state, enc_state_size);
-                    write(dev, (void*) &buf, cnt);
                     do_debug("NET2TAP: sended %d bytes\n", cnt);
                 } else if (aes) {
+                    if (cnt < 32 + 16) {
+                        continue;
+                    }
                     bool toexit = false;
                     int keychanged = 0;
                     while (memcmp(buf, curKey2->sha, 32) != 0) {
@@ -581,11 +610,19 @@ int main(int argc, char **argv) {
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     decrypt(buf + 32, cnt, curKey2->key, iv_cur, buf + 32);
                     memcpy(&cnt, buf + 32, 2);
-                    write(dev, (void*) &(*(buf + 34)), cnt);
+                    memmove((void*) &(buf), (void*) &(*(buf + 34)), cnt);
                     do_debug("NET2TAP: sended %d bytes\n", cnt);
                 } else {
-                    write(dev, (void*) &buf, cnt);
                 }
+
+                if (gzip) {
+                    do_debug("ZIPPED LENGTH: %lu\n", cnt);
+                    uLong ziplength = unzip(buf, cnt, bufzip);
+                    do_debug("UNZIPPED LENGTH: %lu\n", ziplength);
+                    memcpy(buf, bufzip, ziplength);
+                    cnt = ziplength;
+                }
+                write(dev, (void*) &buf, cnt);
             }
         }
     }

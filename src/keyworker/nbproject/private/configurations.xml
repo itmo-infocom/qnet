@@ -8,6 +8,8 @@
       <in>sha3.c</in>
       <in>sha3.h</in>
     </df>
+    <df root="." name="1">
+    </df>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
