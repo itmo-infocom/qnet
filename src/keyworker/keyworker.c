@@ -523,8 +523,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     fflush(stdout);
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(fileno(stderr), &set);
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
     while (1) {
-        (void) getc(stdin);
+        if (select(FD_SETSIZE, NULL, NULL, &set, &timeout) != 1) {
+        }
     }
     intHandler(0);
     //DestructQueue(q1);
