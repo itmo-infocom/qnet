@@ -228,7 +228,7 @@ void usage(void) {
     fprintf(stderr, "\n");
     fprintf(stderr, "-p <port>: port to listen on (default 55554)\n");
     fprintf(stderr, "-d 1: show debug\n");
-    fprintf(stderr, "-t <threads>: run num of threads (0 to 6)\n");
+    fprintf(stderr, "-w <threads>: run num of threads (0 to 6)\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
