@@ -18,8 +18,8 @@
 extern "C" {
 #endif
 
-int curl_get_key(char *postthis, bool newkey);
-int curl_init_addr(char* _addr, int len);
+int curl_get_key(char* _addr, char *postthis, bool newkey);
+int curl_init_addr();
 void curl_clear();
 
 

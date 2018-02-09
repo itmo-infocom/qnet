@@ -372,7 +372,7 @@ void intHandler(int dummy) {
         dbhandle->sync(dbhandle, 0);
         dbhandle->close(dbhandle, 0);
         dbenv->close(dbenv, 0);
-    }      
+    }
     EVP_cleanup();
     exit(0);
 }
@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
 
     OpenSSL_add_all_digests();
 
- 
+
     while ((option = getopt(argc, argv, "p:h:n:d:t:")) > 0) {
         switch (option) {
             case 'd':
@@ -505,9 +505,9 @@ int main(int argc, char *argv[]) {
     int pass = 1;
 
     fflush(stdout);
-    if(thnum>6){
+    if (thnum > 6) {
         thnum = 6;
-    }else if(thnum<=0){
+    } else if (thnum <= 0) {
         thnum = 1;
     }
     my_daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY | MHD_SUPPRESS_DATE_NO_CLOCK
@@ -527,18 +527,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     fflush(stdout);
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(fileno(stderr), &set);
 
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
     while (1) {
-        if (select(FD_SETSIZE, &set, NULL, NULL, &timeout) != 1) {
-            sleep (1);
-            getc(stderr);
-        }
+        sleep(10);/*
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(fileno(stdout), &set);
+        if (select(fileno(stdout) + 1, &set, NULL, NULL, &timeout) != 1) {
+            sleep(1);
+            getc(stdout);
+        }*/
     }
     intHandler(0);
     return (0);

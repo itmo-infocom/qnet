@@ -33,9 +33,8 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
   return realsize;
 }
 
-int curl_init_addr(char* _addr, int len){ 
+int curl_init_addr(){ 
     curl_global_init(CURL_GLOBAL_ALL);
-    memcpy(addr,_addr,len);
     return 0;
 }
 
@@ -43,7 +42,7 @@ void curl_clear(){
     curl_global_cleanup();
 }
  
-char* curl_get_key(char *postthis, bool newkey)
+char* curl_get_key(char* _addr, char *postthis, bool newkey)
 {
   bool realkey=false;
   CURL *curl;
@@ -54,7 +53,7 @@ char* curl_get_key(char *postthis, bool newkey)
   chunk.size = 0;    /* no data at this point */ 
   curl = curl_easy_init();
   if(curl) { 
-    curl_easy_setopt(curl, CURLOPT_URL, addr);
+    curl_easy_setopt(curl, CURLOPT_URL, _addr);
  
     /* send all data to this function  */ 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
