@@ -407,7 +407,7 @@ int main(int argc, char *argv[]) {
     OpenSSL_add_all_digests();
 
 
-    while ((option = getopt(argc, argv, "p:h:n:d:t:")) > 0) {
+    while ((option = getopt(argc, argv, "p:h:n:d:w:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -418,7 +418,7 @@ int main(int argc, char *argv[]) {
             case 'p':
                 portCtrl = atoi(optarg);
                 break;
-            case 't':
+            case 'w':
                 thnum = atoi(optarg);
                 break;
             case 'n':
