@@ -1,9 +1,10 @@
-#include "sha3.h"
+#include "sha.h"
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 // update the state with given number of rounds
 
-void sha3_keccakf(uint64_t st[25])
-{
+void sha3_keccakf(uint64_t st[25]) {
     // constants
     const uint64_t keccakf_rndc[24] = {
         0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
@@ -16,12 +17,12 @@ void sha3_keccakf(uint64_t st[25])
         0x8000000000008080, 0x0000000080000001, 0x8000000080008008
     };
     const int keccakf_rotc[24] = {
-        1,  3,  6,  10, 15, 21, 28, 36, 45, 55, 2,  14,
-        27, 41, 56, 8,  25, 43, 62, 18, 39, 61, 20, 44
+        1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
+        27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44
     };
     const int keccakf_piln[24] = {
-        10, 7,  11, 17, 18, 3, 5,  16, 8,  21, 24, 4,
-        15, 23, 19, 13, 12, 2, 20, 14, 22, 9,  6,  1
+        10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
+        15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1
     };
 
     // variables
@@ -33,11 +34,11 @@ void sha3_keccakf(uint64_t st[25])
 
     // endianess conversion. this is redundant on little-endian targets
     for (i = 0; i < 25; i++) {
-        v = (uint8_t *) &st[i];
-        st[i] = ((uint64_t) v[0])     | (((uint64_t) v[1]) << 8) |
-            (((uint64_t) v[2]) << 16) | (((uint64_t) v[3]) << 24) |
-            (((uint64_t) v[4]) << 32) | (((uint64_t) v[5]) << 40) |
-            (((uint64_t) v[6]) << 48) | (((uint64_t) v[7]) << 56);
+        v = (uint8_t *) & st[i];
+        st[i] = ((uint64_t) v[0]) | (((uint64_t) v[1]) << 8) |
+                (((uint64_t) v[2]) << 16) | (((uint64_t) v[3]) << 24) |
+                (((uint64_t) v[4]) << 32) | (((uint64_t) v[5]) << 40) |
+                (((uint64_t) v[6]) << 48) | (((uint64_t) v[7]) << 56);
     }
 #endif
 
@@ -78,7 +79,7 @@ void sha3_keccakf(uint64_t st[25])
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
     // endianess conversion. this is redundant on little-endian targets
     for (i = 0; i < 25; i++) {
-        v = (uint8_t *) &st[i];
+        v = (uint8_t *) & st[i];
         t = st[i];
         v[0] = t & 0xFF;
         v[1] = (t >> 8) & 0xFF;
@@ -94,8 +95,7 @@ void sha3_keccakf(uint64_t st[25])
 
 // Initialize the context for SHA3
 
-int sha3_init(sha3_ctx_t *c, int mdlen)
-{
+int sha3_init(sha3_ctx_t *c, int mdlen) {
     int i;
 
     for (i = 0; i < 25; i++)
@@ -109,8 +109,7 @@ int sha3_init(sha3_ctx_t *c, int mdlen)
 
 // update state with more data
 
-int sha3_update(sha3_ctx_t *c, const void *data, size_t len)
-{
+int sha3_update(sha3_ctx_t *c, const void *data, size_t len) {
     size_t i;
     int j;
 
@@ -129,8 +128,7 @@ int sha3_update(sha3_ctx_t *c, const void *data, size_t len)
 
 // finalize and output a hash
 
-int sha3_final(void *md, sha3_ctx_t *c)
-{
+int sha3_final(void *md, sha3_ctx_t *c) {
     int i;
 
     c->st.b[c->pt] ^= 0x06;
@@ -146,8 +144,7 @@ int sha3_final(void *md, sha3_ctx_t *c)
 
 // compute a SHA-3 hash (md) of given byte length from "in"
 
-void *sha3(const void *in, size_t inlen, void *md, int mdlen)
-{
+void *sha3(const void *in, size_t inlen, void *md, int mdlen) {
     sha3_ctx_t sha3;
 
     sha3_init(&sha3, mdlen);
@@ -159,16 +156,14 @@ void *sha3(const void *in, size_t inlen, void *md, int mdlen)
 
 // SHAKE128 and SHAKE256 extensible-output functionality
 
-void shake_xof(sha3_ctx_t *c)
-{
+void shake_xof(sha3_ctx_t *c) {
     c->st.b[c->pt] ^= 0x1F;
     c->st.b[c->rsiz - 1] ^= 0x80;
     sha3_keccakf(c->st.q);
     c->pt = 0;
 }
 
-void shake_out(sha3_ctx_t *c, void *out, size_t len)
-{
+void shake_out(sha3_ctx_t *c, void *out, size_t len) {
     size_t i;
     int j;
 
@@ -181,4 +176,17 @@ void shake_out(sha3_ctx_t *c, void *out, size_t len)
         ((uint8_t *) out)[i] = c->st.b[j++];
     }
     c->pt = j;
+}
+
+void *sha256(const void *in, size_t inlen, void *md, int mdlen) {
+    EVP_MD_CTX *mdctx;
+    const EVP_MD *evpmd;
+    const char digestname[10] = "SHA256";
+    mdctx = EVP_MD_CTX_create();
+    evpmd = EVP_get_digestbyname(digestname);
+    EVP_DigestInit_ex(mdctx, evpmd, NULL);
+    EVP_DigestUpdate(mdctx, in, inlen);
+    EVP_DigestFinal_ex(mdctx, md, &mdlen);
+    EVP_MD_CTX_destroy(mdctx);
+    return md;
 }

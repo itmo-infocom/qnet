@@ -25,7 +25,7 @@
 #include <openssl/aes.h>
 #include <openssl/err.h>
 
-#include "sha3.h"
+#include "sha.h"
 #include "keyqueue.h"
 #include <curl/curl.h>
 #include "post_curl.h"
@@ -141,6 +141,7 @@ void intHandler(int dummy) {
     printf("\nEXIT\n");
     if (aes) {
         curl_clear();
+        EVP_cleanup();
     }
     if (blocksize) {
         mcrypt_generic_deinit(td);
@@ -415,6 +416,7 @@ int main(int argc, char **argv) {
     }
 
     if (aes) {
+        OpenSSL_add_all_digests();
         q1 = ConstructQueue(10);
         q2 = ConstructQueue(10);
         char buffer_addr[30];

@@ -16,11 +16,11 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <stdarg.h>
-#include "sha3.h"
 #include "keyqueue.h"
 #include <microhttpd.h>
 #include <db.h>
 #include <libgen.h>
+#include <openssl/evp.h>
 /* buffer for reading from tun/tap interface, must be >= 1500 */
 #define BUFSIZE 2000
 #define CLIENT 0
@@ -226,7 +226,9 @@ void usage(void) {
     fprintf(stderr, "%s -p <port> \n", progname);
     fprintf(stderr, "%s -h\n", progname);
     fprintf(stderr, "\n");
-    fprintf(stderr, "-p <port>: port to listen on 55554\n");
+    fprintf(stderr, "-p <port>: port to listen on (default 55554)\n");
+    fprintf(stderr, "-d 1: show debug\n");
+    fprintf(stderr, "-t <threads>: run num of threads (0 to 6)\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
@@ -370,12 +372,14 @@ void intHandler(int dummy) {
         dbhandle->sync(dbhandle, 0);
         dbhandle->close(dbhandle, 0);
         dbenv->close(dbenv, 0);
-    }
+    }      
+    EVP_cleanup();
     exit(0);
 }
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, intHandler);
+    int thnum = NUMBER_OF_THREADS;
     fprintf(stdout, "Starting\n");
     fflush(stdout);
     int tap_fd, option;
@@ -400,7 +404,10 @@ int main(int argc, char *argv[]) {
     int ret = 0;
     char dbname[255] = "keys.db";
 
-    while ((option = getopt(argc, argv, "p:h:n:d:")) > 0) {
+    OpenSSL_add_all_digests();
+
+ 
+    while ((option = getopt(argc, argv, "p:h:n:d:t:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -410,6 +417,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 portCtrl = atoi(optarg);
+                break;
+            case 't':
+                thnum = atoi(optarg);
                 break;
             case 'n':
                 strncpy(dbname, optarg, 255);
@@ -494,18 +504,12 @@ int main(int argc, char *argv[]) {
 
     int pass = 1;
 
-    /* Check command line options */
-
-#if EPOLL_SUPPORT
-    fprintf("EPOLL\n");
-#endif
     fflush(stdout);
-    /*argv += optind;
-    argc -= optind;
-    if (argc > 0) {
-        my_err("Too many options!\n");
-        usage();
-    }*/
+    if(thnum>6){
+        thnum = 6;
+    }else if(thnum<=0){
+        thnum = 1;
+    }
     my_daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY | MHD_SUPPRESS_DATE_NO_CLOCK
             | MHD_USE_EPOLL_LINUX_ONLY | MHD_USE_EPOLL_TURBO
             ,
@@ -515,8 +519,8 @@ int main(int argc, char *argv[]) {
             &ahc_echo,
             NULL,
             MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
-            MHD_OPTION_THREAD_POOL_SIZE, (unsigned int) NUMBER_OF_THREADS,
-            MHD_OPTION_CONNECTION_LIMIT, (unsigned int) 4,
+            MHD_OPTION_THREAD_POOL_SIZE, (unsigned int) thnum,
+            MHD_OPTION_CONNECTION_LIMIT, (unsigned int) 100,
             MHD_OPTION_END);
     if (my_daemon == NULL) {
         my_err("Error in libmicrohttpd\n");
@@ -526,16 +530,17 @@ int main(int argc, char *argv[]) {
     fd_set set;
     FD_ZERO(&set);
     FD_SET(fileno(stderr), &set);
+
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
     while (1) {
-        if (select(FD_SETSIZE, NULL, NULL, &set, &timeout) != 1) {
+        if (select(FD_SETSIZE, &set, NULL, NULL, &timeout) != 1) {
+            sleep (1);
+            getc(stderr);
         }
     }
     intHandler(0);
-    //DestructQueue(q1);
-    //DestructQueue(q2);
     return (0);
 }
 

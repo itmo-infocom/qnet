@@ -1,4 +1,4 @@
 all:
-	cc sha3.c keyqueue.c keyworker.c -lmicrohttpd -ldb -o keyworker
+	cc sha.c keyqueue.c keyworker.c -lmicrohttpd -ldb -lcrypto -o keyworker
 clean:
 	rm keyworker
