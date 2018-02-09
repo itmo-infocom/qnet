@@ -80,7 +80,7 @@ char* curl_get_key(char *postthis, bool newkey)
               curl_easy_strerror(res));
     }
     else {
-      printf("%s\n",chunk.memory);
+      //printf("%s\n",chunk.memory);
       if(newkey){
           realkey = true;
       }

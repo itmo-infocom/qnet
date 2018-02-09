@@ -43,6 +43,7 @@ union sockaddr_4or6 {
     struct sockaddr a;
 };
 
+int debug = 0;
 bool getKeyBySha(uint8_t* sha);
 
 void getLastKey() {
@@ -53,11 +54,13 @@ void getLastKey() {
         for (i = 0; i < 32; i++) {
             sscanf(nextkey + i * 2, "%02X", &(buff[i]));
         }
-        for (i = 0; i < 32; i++) {
-            printf("%02X", buff[i]);
+        if (debug) {
+            for (i = 0; i < 32; i++) {
+                printf("%02X", buff[i]);
+            }
+            printf("\n");
+            printf("NEWKEYOK\n");
         }
-        printf("\n");
-        printf("NEWKEYOK\n");
         KEY *k1 = ConstructKey(buff);
         KEY *k2 = CopyKey(k1);
         Enqueue(q1, k1);
@@ -81,11 +84,13 @@ bool getKeyBySha(uint8_t* sha) {
         for (i = 0; i < 32; i++) {
             sscanf(nextkey + i * 2, "%02X", &(buff[i]));
         }
-        for (i = 0; i < 32; i++) {
-            printf("%02X", buff[i]);
+        if (debug) {
+            for (i = 0; i < 32; i++) {
+                printf("%02X", buff[i]);
+            }
+            printf("\n");
+            printf("NEWKEYBYSHAOK\n");
         }
-        printf("\n");
-        printf("NEWKEYBYSHAOK\n");
         KEY *k1 = ConstructKeySha(buff, sha);
         KEY *k2 = CopyKey(k1);
         Enqueue(q1, k1);
@@ -95,7 +100,6 @@ bool getKeyBySha(uint8_t* sha) {
         return false;
     }
 }
-int debug = 0;
 
 void do_debug(char *msg, ...) {
     va_list argp;
@@ -190,9 +194,9 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 }
 
 uLong zip(unsigned char *input_data, int len, unsigned char *output_data, int level) {
-    if(level>9){
+    if (level > 9) {
         level = 9;
-    }else if(level<0){
+    } else if (level < 0) {
         level = 0;
     }
     unsigned long slen = len;
@@ -468,7 +472,9 @@ int main(int argc, char **argv) {
                         }
                     } else {
                         curKey1 = Dequeue(q1);
-                        PrintKey(curKey1);
+                        if (debug) {
+                            PrintKey(curKey1);
+                        }
                         do_debug("TAP2NET: New key 2\n");
                         keychanged = 1;
                     }
