@@ -1,4 +1,6 @@
-#include "sha3.h"
+#include "sha.h"
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 // update the state with given number of rounds
 
@@ -181,4 +183,17 @@ void shake_out(sha3_ctx_t *c, void *out, size_t len)
         ((uint8_t *) out)[i] = c->st.b[j++];
     }
     c->pt = j;
+}
+
+void *sha256(const void *in, size_t inlen, void *md, int mdlen) {
+    EVP_MD_CTX *mdctx;
+    const EVP_MD *evpmd;
+    const char digestname[10] = "SHA256";
+    mdctx = EVP_MD_CTX_create();
+    evpmd = EVP_get_digestbyname(digestname);
+    EVP_DigestInit_ex(mdctx, evpmd, NULL);
+    EVP_DigestUpdate(mdctx, in, inlen);
+    EVP_DigestFinal_ex(mdctx, md, &mdlen);
+    EVP_MD_CTX_destroy(mdctx);
+    return md;
 }

@@ -1,4 +1,4 @@
 all:
-	cc -o ctap aes.c sha3.c keyqueue.c post_curl.c ctap.c -lmicrohttpd -lcurl
+	cc -o ctap aes.c sha.c keyqueue.c post_curl.c ctap.c -lmicrohttpd -lcurl -lcrypto
 clean:
 	rm ctap

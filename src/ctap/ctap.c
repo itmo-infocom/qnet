@@ -16,7 +16,7 @@
 #include <errno.h> 
 #include <stdarg.h>
 #include "aes.h"
-#include "sha3.h"
+#include "sha.h"
 #include "keyqueue.h"
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -391,6 +391,8 @@ int main(int argc, char *argv[]) {
                 usage();
         }
     }
+    
+    OpenSSL_add_all_digests();
     /*argv += optind;
     argc -= optind;
     if (argc > 0) {

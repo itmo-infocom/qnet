@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "keyqueue.h"
-#include "sha3.h"
+#include "sha.h"
 
 
 #define TRUE  1
@@ -53,7 +53,7 @@ KEY *ConstructKeyUsage(uint8_t *buf, uint8_t usage) {
     for(i=0;i<32;i++){
         key->key[i]=buf[i];
     }
-    sha3(key->key,32,key->sha,32);
+    sha256(key->key, 32, key->sha, 32);
     return key;
 }
 
