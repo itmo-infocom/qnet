@@ -151,7 +151,7 @@ defaults:
       prio: 10
       port: None
       vhost: None
-      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/keyworker/keyworker -p {port} -n {name}.db -d 1
+      cmdline: python /root/qnet/mininet-qnet/run_daemon.py start {name} /root/qnet/src/keyworker/keyworker -p {port} -n {name}/{name}.db -d 1
       killcmd: python /root/qnet/mininet-qnet/run_daemon.py stop {name}
 
     - &httpd
