@@ -403,6 +403,7 @@ int main(int argc, char *argv[]) {
     u_int32_t envFlags;
     int ret = 0;
     char dbname[255] = "keys.db";
+    char dbdir[255] = "";
 
     OpenSSL_add_all_digests();
 
@@ -429,6 +430,11 @@ int main(int argc, char *argv[]) {
                 usage();
         }
     }
+    strcpy(dbdir, dbname);
+    dirname(dbdir);
+    
+    mkdir(dbdir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    fprintf(stdout, "file %s\n", dbname);
 
     if ((ret = db_env_create(&dbenv, 0)) != 0) {
         printf("%s: %s\n", progname, db_strerror(ret));
@@ -532,7 +538,7 @@ int main(int argc, char *argv[]) {
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
     while (1) {
-        sleep(10);/*
+        sleep(10); /*
         fd_set set;
         FD_ZERO(&set);
         FD_SET(fileno(stdout), &set);
