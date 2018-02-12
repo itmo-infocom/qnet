@@ -37,6 +37,7 @@
 #include <math.h>
 
 pthread_mutex_t lock;
+pthread_mutex_t locksend;
 
 Queue *q1;
 Queue *q2;
@@ -161,6 +162,7 @@ void intHandler(int dummy) {
         mcrypt_module_close(td);
     }
     pthread_mutex_destroy(&lock);
+    pthread_mutex_destroy(&locksend);
     exit(0);
 }
 
@@ -267,6 +269,7 @@ void zipandsend(void *argp) {
             free(args->curKey);
             free(args->iv);
         }
+        pthread_mutex_lock(&locksend);
         if (0 > (cnt = sendto(sock, buf, cnt, 0, (struct sockaddr*) &(args->addrDest), addrlen))) {
             perror("Error while sending a packet.\n");
             switch (errno) {
@@ -304,6 +307,7 @@ void zipandsend(void *argp) {
         } else {
             do_debug("SENDED LENGTH: %lu\n", cnt);
         }
+        pthread_mutex_unlock(&locksend);
     } else {
         if (aes) {
             unsigned char *bufaes = NULL;
@@ -600,6 +604,10 @@ int main(int argc, char **argv) {
     int autoaddress = 1;
 
     if (pthread_mutex_init(&lock, NULL) != 0) {
+        printf("\n mutex init failed\n");
+        return 1;
+    }
+    if (pthread_mutex_init(&locksend, NULL) != 0) {
         printf("\n mutex init failed\n");
         return 1;
     }
