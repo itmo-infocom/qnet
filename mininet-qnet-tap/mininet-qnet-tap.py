@@ -14,8 +14,9 @@ import yaml
 import sys
 import pprint
 import time
+from parse_yaml import Loader
 
-config = yaml.load(open(sys.argv[1]).read()+open(sys.argv[2]).read())
+config = yaml.load(open(sys.argv[1]).read()+open(sys.argv[2]).read(), Loader)
 host = sys.argv[3]
 #pprint.pprint(config)
 
@@ -112,7 +113,6 @@ try:
             call(task['cmdline'].format(**task), shell=True)
         to_kill.append(task)
     time.sleep(5)
-
     CLI(net)
 except:
     traceback.print_exc(file=sys.stdout)
