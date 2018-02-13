@@ -36,6 +36,8 @@ bool toclose = false;
 KEY *curKey1;
 KEY *curKey2;
 bool use_udp = false;
+int haslimit = 0;
+int waslimit = 0;
 
 struct sockaddr_in si_other;
 socklen_t slen;
@@ -236,7 +238,7 @@ void my_err(char *msg, ...) {
 void usage(void) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s -i <ifacename> [-s|-c <serverIP>] [-p <port>] [-k <port>] [-u|-a] [-d]\n", progname);
-    fprintf(stderr, "%s -i tap0 -s -b 2221 -a -p 2222 -q 127.0.0.1 -r 55554 -k 1111 -v 192.168.1.187\n", progname);
+    fprintf(stderr, "%s -i tap0 -s -a -p 2222 -q 127.0.0.1 -r 55554 -k 1111 -v 192.168.1.187\n", progname);
 
 
     fprintf(stderr, "%s -h\n", progname);
@@ -246,6 +248,7 @@ void usage(void) {
     fprintf(stderr, "-p <port>: port to listen on (if run in server mode) or to connect to (in client mode), default 55555\n");
     fprintf(stderr, "-k <port>: port to listen keys, default 55554\n");
     fprintf(stderr, "-u|-a: use TUN (-u, default) or TAP (-a)\n");
+    fprintf(stderr, "-l 1: restrict key reuse\n");
     fprintf(stderr, "-d: outputs debug information while running\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
@@ -343,7 +346,7 @@ int main(int argc, char *argv[]) {
     q2 = ConstructQueue(100);
 
     /* Check command line options */
-    while ((option = getopt(argc, argv, "i:q:r:k:sc:p:uahdt:v:")) > 0) {
+    while ((option = getopt(argc, argv, "i:q:r:k:sc:p:uahdt:v:l")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -382,6 +385,9 @@ int main(int argc, char *argv[]) {
             case 'a':
                 flags = IFF_TAP;
                 break;
+            case 'l':
+                haslimit = 1;
+                break;
             case 'v':
                 use_udp = true;
                 strncpy(other_ip, optarg, 15);
@@ -391,7 +397,7 @@ int main(int argc, char *argv[]) {
                 usage();
         }
     }
-    
+
     OpenSSL_add_all_digests();
     /*argv += optind;
     argc -= optind;
@@ -416,7 +422,7 @@ int main(int argc, char *argv[]) {
 
     if (use_udp == true) {
         memset(&si_other, 0, sizeof (si_other));
-        
+
         slen = sizeof si_other;
         si_other.sin_family = AF_INET;
         si_other.sin_port = htons(portother);
@@ -465,29 +471,29 @@ int main(int argc, char *argv[]) {
             local.sin_family = AF_INET;
             local.sin_addr.s_addr = htonl(INADDR_ANY);
             local.sin_port = htons(port);
-            bzero(&(local.sin_zero),8);        
+            bzero(&(local.sin_zero), 8);
             if (bind(sock_fd, (struct sockaddr*) &local, sizeof (local)) < 0) {
                 perror("bind()");
                 exit(1);
             }
-            char* buf="HELLO";
+            char* buf = "HELLO";
             ssize_t firstwrite = 0;
             sleep(1);
-            if ((firstwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*)&si_other, sizeof (si_other))) < 0) {
+            if ((firstwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*) &si_other, sizeof (si_other))) < 0) {
                 perror("Send data!!!");
                 //exit(1);
                 firstwrite = 0;
-            }else{
-                printf("SENDED: %d\n",firstwrite);
+            } else {
+                printf("SENDED: %d\n", firstwrite);
             }
             socklen_t cslen = sizeof si_other;
-            ssize_t count=recvfrom(sock_fd,buffer,sizeof(buffer),0,(struct sockaddr *) &si_other, &cslen);
-            if (count==-1) {
+            ssize_t count = recvfrom(sock_fd, buffer, sizeof (buffer), 0, (struct sockaddr *) &si_other, &cslen);
+            if (count == -1) {
                 perror("ERROR READ!!!");
-            } else if (count==sizeof(buffer)) {
+            } else if (count == sizeof (buffer)) {
                 printf("TOO LARGE\n");
             } else {
-                printf("RECIEVED!!!: %d\n",count);
+                printf("RECIEVED!!!: %d\n", count);
             }
             int flags = fcntl(sock_fd, F_GETFL);
             flags |= O_NONBLOCK;
@@ -518,7 +524,7 @@ int main(int argc, char *argv[]) {
         local.sin_family = AF_INET;
         local.sin_addr.s_addr = htonl(INADDR_ANY);
         local.sin_port = htons(port);
-        bzero(&(local.sin_zero),8);
+        bzero(&(local.sin_zero), 8);
         if (bind(sock_fd, (struct sockaddr*) &local, sizeof (local)) < 0) {
             perror("bind()");
             exit(1);
@@ -529,25 +535,25 @@ int main(int argc, char *argv[]) {
                 perror("listen()");
                 exit(1);
             }
-        } else {                 
+        } else {
             //ssize_t count = read(sock_fd, buffer, sizeof(buffer));
             socklen_t cslen = sizeof si_other;
-            ssize_t count=recvfrom(sock_fd,buffer,sizeof(buffer),0,(struct sockaddr *) &si_other, &cslen);
-            if (count==-1) {
+            ssize_t count = recvfrom(sock_fd, buffer, sizeof (buffer), 0, (struct sockaddr *) &si_other, &cslen);
+            if (count == -1) {
                 perror("ERROR READ!!!");
-            } else if (count==sizeof(buffer)) {
+            } else if (count == sizeof (buffer)) {
                 printf("TOO LARGE\n");
             } else {
-                printf("RECIEVED!!!: %d\n",count);
+                printf("RECIEVED!!!: %d\n", count);
             }
-            char* buf="HELLO";
-            if ((nwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*)&si_other, sizeof (si_other))) < 0) {
+            char* buf = "HELLO";
+            if ((nwrite = sendto(sock_fd, buf, 5, 0, (struct sockaddr*) &si_other, sizeof (si_other))) < 0) {
                 perror("Send data!!!");
                 //exit(1);
                 nwrite = 0;
-            }else{
-                printf("SENDED: %d\n",nwrite);
-            }    
+            } else {
+                printf("SENDED: %d\n", nwrite);
+            }
             int flags = fcntl(sock_fd, F_GETFL);
             flags |= O_NONBLOCK;
             //fcntl(sock_fd, F_SETFL, flags);    
@@ -599,30 +605,59 @@ int main(int argc, char *argv[]) {
             } else {
                 diff = nread;
             }
-            if (curKey1 == NULL) {
+            if (curKey1 == NULL || waslimit) {
                 if (isEmpty(q1)) {
                     getLastKey();
                     if (isEmpty(q1)) {
                         do_debug("No keys\n");
                         continue;
                     } else {
-                        curKey1 = Dequeue(q1);
+                        if (haslimit) {
+                            KEY *lastKeyLoaded = Dequeue(q1);
+                            if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
+                                do_debug("TAP2NET: LIMIT REUSE\n");
+                                waslimit = 1;
+                                continue;
+                            } else {
+                                waslimit = 0;
+                                curKey1 = lastKeyLoaded;
+                            }
+                        } else {
+                            curKey1 = Dequeue(q1);
+                        }
                         do_debug("New key\n");
                     }
                 } else {
                     curKey1 = Dequeue(q1);
                     do_debug("New key\n");
                 }
-            } else if (curKey1->usage > 10) {
+            } else if (curKey1->usage > 100) {
                 do_debug("%d usages of key\n", curKey1->usage);
                 if (!isEmpty(q1)) {
                     curKey1 = Dequeue(q1);
                 } else {
                     getLastKey();
                     if (isEmpty(q1)) {
+                        if (haslimit) {
+                            usleep(100000);
+                            do_debug("TAP2NET: LIMIT REUSE\n");
+                            continue;
+                        }
                         do_debug("No keys, last usage\n");
                     } else {
-                        curKey1 = Dequeue(q1);
+                        if (haslimit) {
+                            KEY *lastKeyLoaded = Dequeue(q1);
+                            if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
+                                do_debug("TAP2NET: LIMIT REUSE\n");
+                                waslimit = 1;
+                                continue;
+                            } else {
+                                waslimit = 0;
+                                curKey1 = lastKeyLoaded;
+                            }
+                        } else {
+                            curKey1 = Dequeue(q1);
+                        }
                         do_debug("New key\n");
                     }
                 }

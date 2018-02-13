@@ -44,6 +44,8 @@ Queue *q2;
 KEY *curKey1;
 KEY *curKey2;
 char buffer_addr[30];
+int haslimit = 0;
+int waslimit = 0;
 
 union sockaddr_4or6 {
     struct sockaddr_in a4;
@@ -141,6 +143,7 @@ void usage(void) {
     fprintf(stderr, "-q <ip>: ip to connect for keys\n");
     fprintf(stderr, "-r <port>: port to connect for keys\n");
     fprintf(stderr, "-w <cores>: cores count (1-6)\n");
+    fprintf(stderr, "-l 1: restrict key reuse\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
@@ -618,7 +621,7 @@ int main(int argc, char **argv) {
     char* rport = NULL;
     char* fcname = NULL;
     int cores = 0;
-    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:z:w:")) > 0) {
+    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:z:w:l:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -662,6 +665,9 @@ int main(int argc, char **argv) {
             case 'e':
                 aes = 256;
                 ppk = atoi(optarg);
+                break;
+            case 'l':
+                haslimit = 1;
                 break;
             case 'w':
                 cores = atoi(optarg);
@@ -834,7 +840,7 @@ int main(int argc, char **argv) {
             if (aes) {
                 memmove((void*) &(*(buf + 34)), (void*) &(buf), cnt);
                 do_debug("TAP2NET: received %d bytes\n", cnt);
-                if (curKey1 == NULL) {
+                if (curKey1 == NULL || waslimit) {
                     int keychanged = 0;
                     if (isEmpty(q1)) {
                         getLastKey();
@@ -842,7 +848,19 @@ int main(int argc, char **argv) {
                             do_debug("TAP2NET: No keys\n");
                             continue;
                         } else {
-                            curKey1 = Dequeue(q1);
+                            if (haslimit) {
+                                KEY *lastKeyLoaded = Dequeue(q1);
+                                if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
+                                    do_debug("TAP2NET: LIMIT REUSE\n");
+                                    waslimit = 1;
+                                    continue;
+                                } else {
+                                    waslimit = 0;
+                                    curKey1 = lastKeyLoaded;
+                                }
+                            } else {
+                                curKey1 = Dequeue(q1);
+                            }
                             do_debug("TAP2NET: New key 1\n");
                             keychanged = 1;
                         }
@@ -877,9 +895,26 @@ int main(int argc, char **argv) {
                     } else {
                         getLastKey();
                         if (isEmpty(q1)) {
+                            if (haslimit) {
+                                usleep(100000);
+                                do_debug("TAP2NET: LIMIT REUSE\n");
+                                continue;
+                            }
                             do_debug("TAP2NET: No keys, last usage\n");
                         } else {
-                            curKey1 = Dequeue(q1);
+                            if (haslimit) {
+                                KEY *lastKeyLoaded = Dequeue(q1);
+                                if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
+                                    do_debug("TAP2NET: LIMIT REUSE\n");
+                                    waslimit = 1;
+                                    continue;
+                                } else {
+                                    waslimit = 0;
+                                    curKey1 = lastKeyLoaded;
+                                }
+                            } else {
+                                curKey1 = Dequeue(q1);
+                            }
                             do_debug("TAP2NET: New key 3\n");
                             keychanged = 1;
                         }
