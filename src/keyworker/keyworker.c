@@ -449,7 +449,7 @@ int main(int argc, char *argv[]) {
         return (ret);
     }
     if ((ret =
-            dbenv->open(dbenv, dirname(dbname), DB_CREATE | DB_RECOVER | DB_INIT_LOCK |
+            dbenv->open(dbenv, dbdir, DB_CREATE | DB_RECOVER | DB_INIT_LOCK |
             DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_THREAD, 0)) != 0) {
         dbenv->err(dbenv, ret, "environment open: %s", dirname(dbname));
         dbenv->close(dbenv, 0);
@@ -470,9 +470,9 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "Created\n");
         fflush(stdout);
     }
-    ret = dbhandle->open(dbhandle, NULL, dbname, NULL, DB_BTREE, DB_CREATE | DB_THREAD | DB_AUTO_COMMIT, 0);
+    ret = dbhandle->open(dbhandle, NULL, basename(dbname), NULL, DB_BTREE, DB_CREATE | DB_THREAD | DB_AUTO_COMMIT, 0);
     if (ret != 0) {
-        fprintf(stdout, "Failed to open database file %s: %s\n", dbname, db_strerror(ret));
+        fprintf(stdout, "Failed to open database file %s: %s\n", basename(dbname), db_strerror(ret));
         fflush(stdout);
         return 1;
     }
