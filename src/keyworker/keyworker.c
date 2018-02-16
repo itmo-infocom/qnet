@@ -256,7 +256,7 @@ int putKey(KEY *k, DB *db) {
     db_data.size = sizeof (uint8_t)*37;
     int ret = 0;
     if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
-        ret = db->put(db, NULL, &db_key, &db_data, DB_NOOVERWRITE);
+        ret = db->put(db, t, &db_key, &db_data, DB_NOOVERWRITE);
         if (t->commit(t, 0) != 0) {
             printf("ERROR IN COMMIT!!!\n");
         }
@@ -267,7 +267,15 @@ int putKey(KEY *k, DB *db) {
         return -1;
     }
     if (ret != 0) {
-        my_err("Key ID exists\n");
+		if(debug){
+				switch(ret){
+					case DB_KEYEXIST:
+						my_err("Key ID exists\n");
+						break;
+					default:
+						db->err(db, ret, "DB->put");
+				}
+		}	
     }
     free(key_in);
     return ret;
