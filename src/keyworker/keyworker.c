@@ -112,10 +112,10 @@ static int ahc_echo(void * cls,
                 if (debug) {
                     PrintKey(k);
                 }
-                int ret = assignDeviceBySha(k->sha,dbhandle,realdeviceId);
+                int ret = assignDeviceBySha(k->sha, dbhandle, realdeviceId);
                 free(k);
-                if(ret!=0){
-                    return MHD_NO;                    
+                if (ret != 0) {
+                    return MHD_NO;
                 }
                 int i;
                 for (i = 0; i < 32; i++) {
@@ -272,6 +272,7 @@ void usage(void) {
 int putKey(KEY *k, DB *db, unsigned int device) {
     DB_TXN *t;
     size_t len;
+    DBC *dbc;
     DBT db_key, db_data;
     KEY_IN_DB *key_in = (KEY_IN_DB*) malloc(sizeof (KEY_IN_DB));
     if (key_in == NULL) {
@@ -294,7 +295,14 @@ int putKey(KEY *k, DB *db, unsigned int device) {
     db_data.size = sizeof (KEY_IN_DB);
     int ret = 0;
     if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
+        db->cursor(db, t, &dbc, 0);
         ret = db->put(db, t, &db_key, &db_data, DB_NOOVERWRITE);
+        if (ret != 0) {
+            if (t != NULL)
+                (void)t->abort(t);
+            free(key_in);
+            return -1;
+        }
         if (t->commit(t, 0) != 0) {
             printf("ERROR IN COMMIT!!!\n");
         }
@@ -387,6 +395,12 @@ KEY_IN_DB *getByKey(uint8_t *sha, DB *db) {
     //data.flags = DB_DBT_USERMEM;
     if (dbenv->txn_begin(dbenv, NULL, &t, 0) == 0) {
         int ret = db->get(db, t, &key, &data, 0);
+        if (ret != 0) {
+            if (t != NULL)
+                (void)t->abort(t);
+            free(data.data);
+            return NULL;
+        }
         if (t->commit(t, 0) != 0) {
             printf("ERROR IN COMMIT!!!\n");
         }
@@ -418,11 +432,15 @@ KEY_IN_DB *getLastKeyDevice(DB *db, unsigned int device) {
         db->cursor(db, t, &dbc, 0);
         int ret;
         int flag = 0;
+        int usage = 300;
         for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
                 ret == 0;
                 ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
             if (((KEY_IN_DB*) (data_dbt.data))->device == device) {
                 if (((KEY_IN_DB*) (data_dbt.data))->usage != 0) {
+                    if (((KEY_IN_DB*) (data_dbt.data))->usage < usage) {
+                        usage = ((KEY_IN_DB*) (data_dbt.data))->usage;
+                    }
                     if (flag) {
                         for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_NEXT);
                                 ret == 0;
@@ -433,12 +451,25 @@ KEY_IN_DB *getLastKeyDevice(DB *db, unsigned int device) {
                         }
                         break;
                     } else {
-                        break;
+                        continue;
                     }
                 } else {
                     flag = 1;
                 }
             }
+        }
+        if (ret != 0) {
+            if(debug){
+                printf("PROC %d!!!\n", usage);
+            }
+            for (ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_LAST);
+                    ret == 0;
+                    ret = dbc->get(dbc, &key_dbt, &data_dbt, DB_PREV)) {
+                if (((KEY_IN_DB*) (data_dbt.data))->device == device && ((KEY_IN_DB*) (data_dbt.data))->usage <= usage) {
+                    break;
+                }
+            }
+
         }
 
         if (((KEY_IN_DB*) (data_dbt.data))->device != device) {
@@ -456,6 +487,8 @@ KEY_IN_DB *getLastKeyDevice(DB *db, unsigned int device) {
         dbc->put(dbc, &key_dbt, &data_dbt, DB_CURRENT);
         free(data_dbt.data);
         if (t->commit(t, 0) != 0) {
+            if (t != NULL)
+                (void)t->abort(t);
             printf("ERROR IN COMMIT!!!\n");
         }
     } else {
@@ -578,6 +611,10 @@ int main(int argc, char *argv[]) {
     }
 
     //sleep(1);
+
+    if (debug) {
+        dbhandle->stat_print(dbhandle, DB_FAST_STAT);
+    }
 
     KEY *newkey = ConstructKey(key[0]);
 
