@@ -11,6 +11,9 @@ typedef struct KEY {
     uint8_t sha[32];
     uint8_t key[32];
     uint8_t usage;
+    unsigned int addedtime;
+    unsigned int lastusagetime;
+    unsigned int device;
     struct KEY *prev;
 } KEY;
 

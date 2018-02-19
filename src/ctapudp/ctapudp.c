@@ -829,6 +829,7 @@ int main(int argc, char **argv) {
         if (ret < 0) continue;
         if (FD_ISSET(dev, &rfds)) {
             cnt = read(dev, (void*) &(buf), 1518);
+            int tosend = 1;
 
             if (gzip) {
                 do_debug("PREZIPPED LENGTH: %lu\n", cnt);
@@ -846,14 +847,14 @@ int main(int argc, char **argv) {
                         getLastKey();
                         if (isEmpty(q1)) {
                             do_debug("TAP2NET: No keys\n");
-                            continue;
+                            tosend = 0;
                         } else {
                             if (haslimit) {
                                 KEY *lastKeyLoaded = Dequeue(q1);
                                 if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
                                     do_debug("TAP2NET: LIMIT REUSE\n");
                                     waslimit = 1;
-                                    continue;
+                                    tosend = 0;
                                 } else {
                                     waslimit = 0;
                                     curKey1 = lastKeyLoaded;
@@ -875,16 +876,20 @@ int main(int argc, char **argv) {
                     if (keychanged) {
                     }
                 }
-                curKey1->usage++;
-                memcpy(buf, curKey1->sha, 32);
-                memcpy(buf + 32, &cnt, 2);
-                cnt += 2;
-                memcpy(iv_cur, iv, AES_BLOCK_SIZE);
-                int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
-                cnt = newcnt + 32;
+                if (tosend) {
+                    curKey1->usage++;
+                    memcpy(buf, curKey1->sha, 32);
+                    memcpy(buf + 32, &cnt, 2);
+                    cnt += 2;
+                    memcpy(iv_cur, iv, AES_BLOCK_SIZE);
+                    int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
+                    cnt = newcnt + 32;
+                }
             }
-            sendto(sock, &buf, cnt, 0, &addr.a, slen);
-            do_debug("TAP2NET: sended %d bytes\n", cnt);
+            if (tosend) {
+                sendto(sock, &buf, cnt, 0, &addr.a, slen);
+                do_debug("TAP2NET: sended %d bytes\n", cnt);
+            }
             if (aes) {
                 if (curKey1->usage > ppk) {
                     int keychanged = 0;
