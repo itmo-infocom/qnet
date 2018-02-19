@@ -44,11 +44,12 @@ Queue *q1;
 Queue *q2;
 KEY *curKey1;
 KEY *curKey2;
-KEY *curKeyToSend;
+uint8_t *curKeyToSend;
 char buffer_addr[30];
 int haslimit = 0;
 int waslimit = 0;
 int deviceid = 0;
+int isserver = 1;
 
 union sockaddr_4or6 {
     struct sockaddr_in a4;
@@ -65,6 +66,13 @@ int putKey(uint8_t* sha) {
     for (i = 0; i < 32; i++) {
         sprintf(qbuffer + i * 2, "%02X", sha[i]);
     }
+    if (debug) {
+        printf("putKey: \n");
+        for (i = 0; i < 32; i++) {
+            printf("%02X", sha[i]);
+        }
+        printf("\n");
+    }
     char* nextkey = curl_get_key(buffer_addr, qbuffer, true);
     if (nextkey != NULL) {
         return 0;
@@ -72,25 +80,24 @@ int putKey(uint8_t* sha) {
     return 1;
 }
 
-KEY *requestKey() {
+uint8_t *requestKey() {
     char response_buffer[64];
     sprintf(response_buffer, "request%d\0", deviceid);
     char* nextkey = curl_get_key(buffer_addr, response_buffer, true);
-    uint8_t buff[32];
     if (nextkey != NULL) {
+        uint8_t *buff = (uint8_t*) malloc(32);
         int i;
         for (i = 0; i < 32; i++) {
             sscanf(nextkey + i * 2, "%02X", &(buff[i]));
         }
         if (debug) {
+            printf("requestKey: \n");
             for (i = 0; i < 32; i++) {
                 printf("%02X", buff[i]);
             }
             printf("\n");
-            printf("NEWKEYOK\n");
         }
-        KEY *k1 = ConstructKey(buff);
-        return k1;
+        return buff;
     }
     return NULL;
 }
@@ -674,10 +681,12 @@ int main(int argc, char **argv) {
                 dev_name = optarg;
                 break;
             case 's':
+                isserver = 1;
                 autoaddress = 1;
                 laddr = optarg;
                 break;
             case 'c':
+                isserver = 0;
                 autoaddress = 0;
                 laddr = optarg;
                 break;
@@ -883,7 +892,7 @@ int main(int argc, char **argv) {
                 cnt = ziplength;
             }
             if (aes) {
-                memmove((void*) &(*(buf + 34)), (void*) &(buf), cnt);
+                memmove((void*) &(*(buf + 32 + sizeof (int))), (void*) &(buf), cnt);
                 do_debug("TAP2NET: received %d bytes\n", cnt);
                 if (curKey1 == NULL || waslimit) {
                     int keychanged = 0;
@@ -924,20 +933,20 @@ int main(int argc, char **argv) {
                     curKey1->usage++;
                     memcpy(buf, curKey1->sha, 32);
                     int rcnt = cnt;
-                    if (curKey1->usage == ppk / 2) {
+                    if (!isserver&&curKey1->usage == ppk / 2) {
                         rcnt = -(cnt | 2048);
                         do_debug("TAP2NET: REQUEST T1\n");
                     } else if (curKeyToSend != NULL) {
                         rcnt = -(cnt | 4096);
                         do_debug("TAP2NET: REQUEST T2\n");
-                        memmove((void*) &(*(buf + 34 + 32)), (void*) &(*(buf + 34)), cnt);
-                        memcpy(buf+34+32, curKeyToSend->key, 32);
+                        memmove((void*) &(*(buf + 32 + sizeof (int) + 32)), (void*) &(*(buf + 32 + sizeof (int))), cnt);
+                        memcpy(buf + 32 + sizeof (int), curKeyToSend, 32);
                         free(curKeyToSend);
                         curKeyToSend = NULL;
-                        cnt+=32;
+                        cnt += 32;
                     }
-                    memcpy(buf + 32, &rcnt, 2);
-                    cnt += 2;
+                    memcpy(buf + 32, &rcnt, sizeof (int));
+                    cnt += sizeof (int);
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
                     cnt = newcnt + 32;
@@ -1083,9 +1092,10 @@ int main(int argc, char **argv) {
                     } else {
                         cnt = cnt;
                     }*/
+                    do_debug("NET2TAP: PRESIZE %d\n", cnt);
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     decrypt(buf + 32, cnt, curKey2->key, iv_cur, buf + 32);
-                    memcpy(&cnt, buf + 32, 2);
+                    memcpy(&cnt, buf + 32, sizeof (int));
                     int rcnt = cnt;
                     if (rcnt < 0) {
                         rcnt = -rcnt;
@@ -1093,18 +1103,19 @@ int main(int argc, char **argv) {
                             rcnt = rcnt - 2048;
                             do_debug("NET2TAP: REQUEST T1\n");
                             curKeyToSend = requestKey();
-                        }else if((rcnt & 4096) == 4096) {
+                        } else if ((rcnt & 4096) == 4096) {
                             rcnt = rcnt - 4096;
-                            uint8_t newkeyreceived[32];
-                            memcpy(newkeyreceived,buf+34,32);
+                            uint8_t *newkeyreceived = malloc(32);
+                            memcpy(newkeyreceived, buf + 32 + sizeof (int), 32);
                             putKey(newkeyreceived);
                             free(newkeyreceived);
-                            memmove((void*) &(*(buf + 34)), (void*) &(*(buf + 34 + 32)), rcnt);                            
-                            do_debug("NET2TAP: REQUEST T2\n");                            
+                            memmove((void*) &(*(buf + 32 + sizeof (int))), (void*) &(*(buf + 32 + sizeof (int) + 32)), rcnt);
+                            do_debug("NET2TAP: REQUEST T2\n");
                         }
                     }
-                    memmove((void*) &(buf), (void*) &(*(buf + 34)), rcnt);
+                    memmove((void*) &(buf), (void*) &(*(buf + 32 + sizeof (int))), rcnt);
                     do_debug("NET2TAP: sended %d bytes\n", rcnt);
+                    cnt = rcnt;
                 } else {
                 }
 
