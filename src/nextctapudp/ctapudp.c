@@ -192,6 +192,7 @@ void usage(void) {
     fprintf(stderr, "-r <port>: port to connect for keys\n");
     fprintf(stderr, "-w <cores>: cores count (1-6)\n");
     fprintf(stderr, "-l 1: restrict key reuse\n");
+    fprintf(stderr, "-y <deviceid>: id of device\n");
     fprintf(stderr, "-h: prints this help text\n");
     exit(1);
 }
