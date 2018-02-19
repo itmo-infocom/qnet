@@ -889,43 +889,43 @@ int main(int argc, char **argv) {
             if (tosend) {
                 sendto(sock, &buf, cnt, 0, &addr.a, slen);
                 do_debug("TAP2NET: sended %d bytes\n", cnt);
-            }
-            if (aes) {
-                if (curKey1->usage > ppk) {
-                    int keychanged = 0;
-                    do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
-                    if (!isEmpty(q1)) {
-                        curKey1 = Dequeue(q1);
-                        keychanged = 1;
-                    } else {
-                        getLastKey();
-                        if (isEmpty(q1)) {
-                            if (haslimit) {
-                                usleep(100000);
-                                do_debug("TAP2NET: LIMIT REUSE\n");
-                                continue;
-                            }
-                            do_debug("TAP2NET: No keys, last usage\n");
-                        } else {
-                            if (haslimit) {
-                                KEY *lastKeyLoaded = Dequeue(q1);
-                                if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
-                                    do_debug("TAP2NET: LIMIT REUSE\n");
-                                    waslimit = 1;
-                                    continue;
-                                } else {
-                                    waslimit = 0;
-                                    curKey1 = lastKeyLoaded;
-                                }
-                            } else {
-                                curKey1 = Dequeue(q1);
-                            }
-                            do_debug("TAP2NET: New key 3\n");
+                if (aes) {
+                    if (curKey1->usage > ppk) {
+                        int keychanged = 0;
+                        do_debug("TAP2NET: %d usages of key\n", curKey1->usage);
+                        if (!isEmpty(q1)) {
+                            curKey1 = Dequeue(q1);
                             keychanged = 1;
+                        } else {
+                            getLastKey();
+                            if (isEmpty(q1)) {
+                                if (haslimit) {
+                                    usleep(100000);
+                                    do_debug("TAP2NET: LIMIT REUSE\n");
+                                    continue;
+                                }
+                                do_debug("TAP2NET: No keys, last usage\n");
+                            } else {
+                                if (haslimit) {
+                                    KEY *lastKeyLoaded = Dequeue(q1);
+                                    if (memcmp(lastKeyLoaded->sha, curKey1->sha, 32) == 0) {
+                                        do_debug("TAP2NET: LIMIT REUSE\n");
+                                        waslimit = 1;
+                                        continue;
+                                    } else {
+                                        waslimit = 0;
+                                        curKey1 = lastKeyLoaded;
+                                    }
+                                } else {
+                                    curKey1 = Dequeue(q1);
+                                }
+                                do_debug("TAP2NET: New key 3\n");
+                                keychanged = 1;
+                            }
                         }
-                    }
-                    if (keychanged) {
-                        //AES_set_encrypt_key(curKey1->key, aes, &enc_key);
+                        if (keychanged) {
+                            //AES_set_encrypt_key(curKey1->key, aes, &enc_key);
+                        }
                     }
                 }
             }
