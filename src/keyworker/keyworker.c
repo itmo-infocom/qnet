@@ -410,7 +410,7 @@ int main(int argc, char *argv[]) {
     };
     u_int32_t envFlags;
     int ret = 0;
-    char dbname[255] = "keys.db";
+    char dbname[255] = "db/keys.db";
     char dbdir[255] = "";
 
     OpenSSL_add_all_digests();
