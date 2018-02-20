@@ -934,7 +934,7 @@ int main(int argc, char **argv) {
                     curKey1->usage++;
                     memcpy(buf, curKey1->sha, 32);
                     int rcnt = cnt;
-                    if (!isserver&&curKey1->usage == ppk / 2) {
+                    if (deviceid>0&&!isserver&&curKey1->usage == ppk / 2) {
                         rcnt = -(cnt | 2048);
                         do_debug("TAP2NET: REQUEST T1\n");
                     } else if (curKeyToSend != NULL) {
