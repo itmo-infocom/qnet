@@ -284,7 +284,7 @@ uLong unzip(unsigned char *input_data, int len, unsigned char *output_data) {
 }
 
 int dev, sock, slen;
-union sockaddr_4or6 addr, from;
+union sockaddr_4or6 addr, addr2, from;
 
 struct zipandsend_args {
     int gziplevel;
@@ -660,6 +660,7 @@ int main(int argc, char **argv) {
     slen = sizeof (struct sockaddr_in);
 
     struct sockaddr_in addrDest;
+    struct sockaddr_in addrDest2;
     int autoaddress = 1;
 
     if (pthread_mutex_init(&lock, NULL) != 0) {
@@ -674,10 +675,12 @@ int main(int argc, char **argv) {
     char* laddr = NULL;
     char* lport = NULL;
     char* rhost = NULL;
+    char* rhost2 = NULL;
     char* rport = NULL;
     char* fcname = NULL;
     int cores = 0;
-    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:z:w:l:y:")) > 0) {
+    int curhost = -1;
+    while ((option = getopt(argc, argv, "i:q:r:k:s:c:p:a:h:d:t:v:e:f:z:w:l:y:b:")) > 0) {
         switch (option) {
             case 'd':
                 debug = 1;
@@ -690,7 +693,7 @@ int main(int argc, char **argv) {
                 break;
             case 's':
                 isserver = 1;
-                autoaddress = 1;
+                autoaddress = 0;
                 laddr = optarg;
                 break;
             case 'c':
@@ -713,6 +716,10 @@ int main(int argc, char **argv) {
                 break;
             case 't':
                 rhost = optarg;
+                break;
+            case 'b':
+                rhost2 = optarg;
+                curhost = 0;
                 break;
             case 'k':
                 rport = optarg;
@@ -822,6 +829,7 @@ int main(int argc, char **argv) {
     }
 
     memset(&addr.a, 0, result->ai_addrlen);
+    memset(&addr2.a, 0, result->ai_addrlen);
     freeaddrinfo(result);
 
     if (!autoaddress) {
@@ -838,11 +846,30 @@ int main(int argc, char **argv) {
         }
         memcpy(&addr.a, result->ai_addr, result->ai_addrlen);
         freeaddrinfo(result);
+        if (curhost == 0) {
+            if (getaddrinfo(rhost2, rport, &hints, &result)) {
+                perror("getaddrinfo for remote address");
+                exit(5);
+            }
+            if (result->ai_next) {
+                fprintf(stderr, "getaddrinfo for remote returned multiple addresses\n");
+            }
+            if (!result) {
+                fprintf(stderr, "getaddrinfo for remote returned no addresses\n");
+                exit(6);
+            }
+            memcpy(&addr2.a, result->ai_addr, result->ai_addrlen);
+            freeaddrinfo(result);
+        }
     }
     addrDest.sin_family = AF_INET;
     addrDest.sin_port = htons(atoi(rport));
     addrDest.sin_addr.s_addr = inet_addr(rhost);
-
+    if (curhost == 0) {
+        addrDest2.sin_family = AF_INET;
+        addrDest2.sin_port = htons(atoi(rport));
+        addrDest2.sin_addr.s_addr = inet_addr(rhost2);
+    }
     if (aes) {
         OpenSSL_add_all_digests();
         q1 = ConstructQueue(10);
@@ -966,7 +993,17 @@ int main(int argc, char **argv) {
                 }
             }
             if (tosend) {
-                sendto(sock, &buf, cnt, 0, &addr.a, slen);
+                if (curhost < 0) {
+                    sendto(sock, &buf, cnt, 0, &addr.a, slen);
+                } else {
+                    if (curhost == 0) {
+                        sendto(sock, &buf, cnt, 0, &addr.a, slen);
+                        curhost = 1;
+                    } else {
+                        sendto(sock, &buf, cnt, 0, &addr2.a, slen);
+                        curhost = 0;
+                    }
+                }
                 do_debug("TAP2NET: sended %d bytes\n", cnt);
                 if (aes) {
                     if (curKey1->usage > ppk) {
@@ -1030,7 +1067,7 @@ int main(int argc, char **argv) {
 
             if (!autoaddress) {
                 if (ip_family == AF_INET) {
-                    if ((from.a4.sin_addr.s_addr == addr.a4.sin_addr.s_addr) && (from.a4.sin_port == addr.a4.sin_port)) {
+                    if (((from.a4.sin_addr.s_addr == addr.a4.sin_addr.s_addr)||(curhost>=0&&(from.a4.sin_addr.s_addr == addr2.a4.sin_addr.s_addr))) && (from.a4.sin_port == addr.a4.sin_port)) {
                         address_ok = 1;
                     }
                 } else {
@@ -1130,12 +1167,12 @@ int main(int argc, char **argv) {
 
                 if (gzip) {
                     do_debug("ZIPPED LENGTH: %lu\n", cnt);
-                    uLong ziplength = unzip(buf+ sizeof (PHEADER), cnt, bufzip);
+                    uLong ziplength = unzip(buf + sizeof (PHEADER), cnt, bufzip);
                     do_debug("UNZIPPED LENGTH: %lu\n", ziplength);
-                    memcpy(buf+ sizeof (PHEADER), bufzip, ziplength);
+                    memcpy(buf + sizeof (PHEADER), bufzip, ziplength);
                     cnt = ziplength;
                 }
-                write(dev, (void*) &(*(buf+ sizeof (PHEADER))), cnt);
+                write(dev, (void*) &(*(buf + sizeof (PHEADER))), cnt);
             }
         }
     }
