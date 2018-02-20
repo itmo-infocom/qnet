@@ -50,12 +50,19 @@ int haslimit = 0;
 int waslimit = 0;
 int deviceid = 0;
 int isserver = 1;
+volatile uint8_t curpakagenum = 0;
 
 union sockaddr_4or6 {
     struct sockaddr_in a4;
     struct sockaddr_in6 a6;
     struct sockaddr a;
 };
+
+typedef struct PHEADER {
+    uint8_t flag;
+    uint8_t pnum;
+    uint16_t length;
+} PHEADER;
 
 int debug = 0;
 bool getKeyBySha(uint8_t* sha);
@@ -882,19 +889,39 @@ int main(int argc, char **argv) {
         ///!!!!!!!!!!!!!!!!!!!!!
         if (ret < 0) continue;
         if (FD_ISSET(dev, &rfds)) {
-            cnt = read(dev, (void*) &(buf), 1518);
+            cnt = read(dev, (void*) &(*(buf + sizeof (PHEADER))), 1518);
             int tosend = 1;
 
             if (gzip) {
                 do_debug("PREZIPPED LENGTH: %lu\n", cnt);
-                uLong ziplength = zip(buf, cnt, bufzip, gziplevel);
+                uLong ziplength = zip(buf + sizeof (PHEADER), cnt, bufzip, gziplevel);
                 do_debug("ZIPPED LENGTH: %lu\n", ziplength);
-                memcpy(buf, bufzip, ziplength);
+                memcpy(buf + sizeof (PHEADER), bufzip, ziplength);
                 cnt = ziplength;
             }
+            PHEADER *ph = malloc(sizeof (PHEADER));
+            ph->flag = 0;
+            ph->pnum = curpakagenum++;
+            int rcnt = cnt;
+            if (aes && deviceid > 0 && !isserver && curKey1->usage == ppk / 2) {
+                ph->flag = 1;
+                do_debug("TAP2NET: REQUEST T1\n");
+            } else if (curKeyToSend != NULL) {
+                ph->flag = 2;
+                do_debug("TAP2NET: REQUEST T2\n");
+                memmove((void*) &(*(buf + sizeof (PHEADER) + 32)), (void*) &(buf), cnt);
+                memcpy(buf + sizeof (PHEADER), curKeyToSend, 32);
+                free(curKeyToSend);
+                curKeyToSend = NULL;
+                cnt += 32;
+            }
+            ph->length = rcnt;
+            do_debug("TAP2NET: prepare package %d\n", ph->pnum);
+            memcpy(buf, ph, sizeof (PHEADER));
+            free(ph);
+            cnt += sizeof (PHEADER);
             if (aes) {
-                memmove((void*) &(*(buf + 32 + sizeof (int))), (void*) &(buf), cnt);
-                do_debug("TAP2NET: received %d bytes\n", cnt);
+                memmove((void*) &(*(buf + 32)), (void*) &(buf), cnt);
                 if (curKey1 == NULL || waslimit) {
                     int keychanged = 0;
                     if (isEmpty(q1)) {
@@ -933,21 +960,6 @@ int main(int argc, char **argv) {
                 if (tosend) {
                     curKey1->usage++;
                     memcpy(buf, curKey1->sha, 32);
-                    int rcnt = cnt;
-                    if (deviceid>0&&!isserver&&curKey1->usage == ppk / 2) {
-                        rcnt = -(cnt | 2048);
-                        do_debug("TAP2NET: REQUEST T1\n");
-                    } else if (curKeyToSend != NULL) {
-                        rcnt = -(cnt | 4096);
-                        do_debug("TAP2NET: REQUEST T2\n");
-                        memmove((void*) &(*(buf + 32 + sizeof (int) + 32)), (void*) &(*(buf + 32 + sizeof (int))), cnt);
-                        memcpy(buf + 32 + sizeof (int), curKeyToSend, 32);
-                        free(curKeyToSend);
-                        curKeyToSend = NULL;
-                        cnt += 32;
-                    }
-                    memcpy(buf + 32, &rcnt, sizeof (int));
-                    cnt += sizeof (int);
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     int newcnt = encrypt(buf + 32, cnt, curKey1->key, iv_cur, buf + 32);
                     cnt = newcnt + 32;
@@ -1096,38 +1108,34 @@ int main(int argc, char **argv) {
                     do_debug("NET2TAP: PRESIZE %d\n", cnt);
                     memcpy(iv_cur, iv, AES_BLOCK_SIZE);
                     decrypt(buf + 32, cnt, curKey2->key, iv_cur, buf + 32);
-                    memcpy(&cnt, buf + 32, sizeof (int));
-                    int rcnt = cnt;
-                    if (rcnt < 0) {
-                        rcnt = -rcnt;
-                        if ((rcnt & 2048) == 2048) {
-                            rcnt = rcnt - 2048;
-                            do_debug("NET2TAP: REQUEST T1\n");
-                            curKeyToSend = requestKey();
-                        } else if ((rcnt & 4096) == 4096) {
-                            rcnt = rcnt - 4096;
-                            uint8_t *newkeyreceived = malloc(32);
-                            memcpy(newkeyreceived, buf + 32 + sizeof (int), 32);
-                            putKey(newkeyreceived);
-                            free(newkeyreceived);
-                            memmove((void*) &(*(buf + 32 + sizeof (int))), (void*) &(*(buf + 32 + sizeof (int) + 32)), rcnt);
-                            do_debug("NET2TAP: REQUEST T2\n");
-                        }
-                    }
-                    memmove((void*) &(buf), (void*) &(*(buf + 32 + sizeof (int))), rcnt);
-                    do_debug("NET2TAP: sended %d bytes\n", rcnt);
-                    cnt = rcnt;
+                    memmove((void*) &(buf), (void*) &(*(buf + 32)), cnt);
                 } else {
                 }
+                PHEADER *ph = malloc(sizeof (PHEADER));
+                memcpy(ph, buf, sizeof (PHEADER));
+                do_debug("NET2TAP: ready package %d\n", ph->pnum);
+                cnt = ph->length;
+                if (ph->flag == 1) {
+                    do_debug("NET2TAP: REQUEST T1\n");
+                    curKeyToSend = requestKey();
+                } else if (ph->flag == 2) {
+                    uint8_t *newkeyreceived = malloc(32);
+                    memcpy(newkeyreceived, buf + 32 + sizeof (PHEADER), 32);
+                    putKey(newkeyreceived);
+                    free(newkeyreceived);
+                    memmove((void*) &(buf), (void*) &(*(buf + 32)), cnt);
+                    do_debug("NET2TAP: REQUEST T2\n");
+                }
+                free(ph);
 
                 if (gzip) {
                     do_debug("ZIPPED LENGTH: %lu\n", cnt);
-                    uLong ziplength = unzip(buf, cnt, bufzip);
+                    uLong ziplength = unzip(buf+ sizeof (PHEADER), cnt, bufzip);
                     do_debug("UNZIPPED LENGTH: %lu\n", ziplength);
-                    memcpy(buf, bufzip, ziplength);
+                    memcpy(buf+ sizeof (PHEADER), bufzip, ziplength);
                     cnt = ziplength;
                 }
-                write(dev, (void*) &buf, cnt);
+                write(dev, (void*) &(*(buf+ sizeof (PHEADER))), cnt);
             }
         }
     }
