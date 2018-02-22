@@ -83,7 +83,8 @@ int initArray(Array *a) {
 
 DB *getOrCreateHandler(Array *a, int num) {
     pthread_mutex_lock(&lock);
-    for (int i = 0; i < a->size; i++) {
+    int i;
+    for (i = 0; i < a->size; i++) {
         if (((DB_IN_ARRAY *) (a->array + i))->devnum == num) {
             pthread_mutex_unlock(&lock);
             return ((DB_IN_ARRAY *) (a->array + i))->dbhandle;
@@ -611,7 +612,6 @@ KEY_IN_DB *getLastKeyDevice(unsigned int device) {
         supportdbhandle->cursor(supportdbhandle, t, &dbc1, 0);
         int ret = dbc1->get(dbc1, &support_key_dbt, &support_data_dbt, DB_CONSUME);
         if (ret == 0) {
-            printf("SIZE %d\n",sizeof(((KEY_IN_SUPPORT_DB*)(support_data_dbt.data))->sha));
             dbhandle->cursor(dbhandle, t, &dbc2, 0);
             key_dbt.size = sizeof(((KEY_IN_SUPPORT_DB*)(support_data_dbt.data))->sha);
             key_dbt.data = &(((KEY_IN_SUPPORT_DB*)(support_data_dbt.data))->sha);
@@ -685,7 +685,8 @@ void intHandler(int dummy) {
     if (my_daemon) {
         MHD_stop_daemon(my_daemon);
     }
-    for (int i = 0; i < (&HandlerArray)->size; i++) {
+    int i;
+    for (i = 0; i < (&HandlerArray)->size; i++) {
         DB *supportdbhandle = ((&HandlerArray)->array + i)->dbhandle;
         if (supportdbhandle) {
             supportdbhandle->sync(supportdbhandle, 0);
