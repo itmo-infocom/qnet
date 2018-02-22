@@ -752,7 +752,7 @@ int main(int argc, char *argv[]) {
                 thnum = atoi(optarg);
                 break;
             case 'n':
-                strncpy(dbname, optarg, 255);
+                strncpy(dbname, optarg, 200);
                 break;
             default:
                 my_err("Unknown option %c\n", option);
