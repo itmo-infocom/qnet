@@ -1,1 +1,1 @@
-cc -o ctap aes.c ctap.c
+cc -o ctap aes.c sha.c keyqueue.c post_curl.c ctap.c -lmicrohttpd -lcurl -lcrypto
