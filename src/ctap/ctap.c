@@ -504,9 +504,9 @@ int main(int argc, char *argv[]) {
             remote.sin_addr.s_addr = inet_addr(remote_ip);
             remote.sin_port = htons(port);
             /* connection request */
-            if (connect(sock_fd, (struct sockaddr*) &remote, sizeof (remote)) < 0) {
+            while (connect(sock_fd, (struct sockaddr*) &remote, sizeof (remote)) < 0) {
                 perror("connect()");
-                exit(1);
+                sleep(1);
             }
             do_debug("CLIENT: Connected to server %s\n", inet_ntoa(remote.sin_addr));
         }
