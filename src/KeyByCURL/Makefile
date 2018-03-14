@@ -1,4 +1,0 @@
-all:
-	g++ -std=c++11 main.cpp -o KeyByCURL.out 
-clean:
-	rm KeyByCURL.out
