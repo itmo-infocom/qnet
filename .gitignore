@@ -5,6 +5,7 @@ src/ctapraw/ctapraw
 src/ctapudp/ctapudp
 src/keyworker/*.db
 src/keyworker/keyworker
+src/QKD_emulator/qkdemu
 
 # Backup files
 *~
