@@ -828,7 +828,7 @@ int main(int argc, char **argv) {
         ///!!!!!!!!!!!!!!!!!!!!!
         if (ret < 0) continue;
         if (FD_ISSET(dev, &rfds)) {
-            cnt = read(dev, (void*) &(buf), 1518);
+            cnt = read(dev, (void*) &(buf), 1542);
             int tosend = 1;
 
             if (gzip) {
