@@ -500,7 +500,7 @@ void mainlistenertap(void *argp) {
         int ret = select(dev + 1, &rfds, NULL, NULL, NULL);
         if (ret < 0) continue;
         if (FD_ISSET(dev, &rfds)) {
-            cnt = read(dev, (void*) buf, 1518);
+            cnt = read(dev, (void*) buf, 1542);
             thpool_wait_max(argsinp->pool);
             struct zipandsend_args *args = malloc(sizeof *args);
             if (args != NULL) {
